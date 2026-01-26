@@ -2,7 +2,7 @@ import streamlit as st
 import duckdb
 
 # Configuração da página
-st.set_page_config(page_title="HunterHardware - Prospecção", layout="wide")
+st.set_page_config(page_title="Hunter_leads - Prospecção", layout="wide")
 
 st.title("🎯 Sistema de Prospecção Pantex")
 
