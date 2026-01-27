@@ -1,0 +1,11 @@
+# Ignorar arquivos de dados pesados
+dados/
+*.zip
+*.csv
+
+# Ignorar o banco de dados (pois ele é gerado pelo script)
+*.db
+hunter_leads.db
+
+# Ignorar arquivos temporários do Python
+__pycache__/
