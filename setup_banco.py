@@ -1,101 +1,107 @@
 import duckdb
 import os
-import zipfile
 
-DB_NAME = 'hunter_leads.db'
-PASTA_DADOS = 'dados'
+print("---  INICIANDO SETUP ---")
 
-# Definição exata das 30 colunas (c0 a c29)
-colunas_estabele = {f'c{i}': 'VARCHAR' for i in range(30)}
-colunas_cnae = {'codigo': 'VARCHAR', 'descricao': 'VARCHAR'}
-
-def extrair_se_necessario(nome_zip, nome_csv):
-    caminho_csv = os.path.join(PASTA_DADOS, nome_csv)
-    if os.path.exists(caminho_csv):
-        print(f" {nome_csv} já existe. Pulando extração.")
-        return True
-    
-    caminho_zip = os.path.join(PASTA_DADOS, nome_zip)
-    if not os.path.exists(caminho_zip):
-        print(f" {nome_zip} não encontrado.")
-        return False
-
-    print(f" Extraindo {nome_zip}...")
+# 1. Limpeza
+if os.path.exists("hunter_leads.db"):
     try:
-        with zipfile.ZipFile(caminho_zip, 'r') as z:
-            nome_original = z.namelist()[0]
-            z.extract(nome_original, PASTA_DADOS)
-            os.rename(os.path.join(PASTA_DADOS, nome_original), caminho_csv)
-            print(f" Extraído: {nome_csv}")
-            return True
+        os.remove("hunter_leads.db")
+        print(" ")
     except Exception as e:
-        print(f" Erro na extração: {e}")
-        return False
+        print(f" : {e}")
+        exit()
 
-def criar_banco():
-    print("--- INICIANDO SETUP (MODO AUTO_DETECT=FALSE) ---")
+con = duckdb.connect('hunter_leads.db')
+
+# 2. Definição das Colunas
+cols_cnae = {'col0': 'VARCHAR', 'col1': 'VARCHAR'}
+cols_estab = {f'col{i}': 'VARCHAR' for i in range(30)}
+
+# 3. Importar CNAES
+print(" Processando CNAES...")
+try:
+    con.execute(f"""
+        CREATE TABLE cnaes AS 
+        SELECT col0 as codigo, col1 as descricao 
+        FROM read_csv(
+            'dados/cnaes.csv', 
+            sep=';', 
+            quote='"', 
+            header=False,
+            encoding='ISO_8859_1',
+            auto_detect=False,
+            columns={cols_cnae}
+        )
+    """)
+    print(" Tabela CNAES criada!")
+except Exception as e:
+    print(f" Erro CNAES: {e}")
+
+# 4. Importar Estabelecimentos (Com ignore_errors=true)
+print(" Processando Estabelecimentos...")
+try:
+    con.execute(f"""
+        CREATE TABLE estabelecimentos AS 
+        SELECT 
+            col0 as cnpj_basico,
+            col1 as cnpj_ordem,
+            col2 as cnpj_dv,
+            col3 as identificador_matriz_filial,
+            col4 as nome_fantasia,
+            col5 as situacao_cadastral,
+            col6 as data_situacao_cadastral,
+            col7 as motivo_situacao_cadastral,
+            col8 as nome_cidade_exterior,
+            col9 as pais,
+            col10 as data_inicio_atividade,
+            col11 as cnae_principal,
+            col12 as cnae_secundario,
+            col13 as tipo_logradouro,
+            col14 as logradouro,
+            col15 as numero,
+            col16 as complemento,
+            col17 as bairro,
+            col18 as cep,
+            col19 as uf,
+            col20 as municipio,
+            col21 as ddd_1,
+            col22 as telefone_1,
+            col23 as ddd_2,
+            col24 as telefone_2,
+            col25 as ddd_fax,
+            col26 as fax,
+            col27 as correio_eletronico,
+            col28 as situacao_especial,
+            col29 as data_situacao_especial
+        FROM read_csv(
+            'dados/estabelecimentos.csv', 
+            sep=';', 
+            quote='"', 
+            header=False, 
+            encoding='ISO_8859_1',
+            auto_detect=False,
+            ignore_errors=true,
+            columns={cols_estab}
+        )
+    """)
+    print(" Tabela Estabelecimentos criada (linhas ruins foram puladas)!")
+
+except Exception as e:
+    print(f" Erro Estabelecimentos: {e}")
+
+# 5. Conferência
+print("\n Conferência Final:")
+try:
+    # Mostra um CNAE para garantir
+    cnae = con.execute("SELECT * FROM cnaes LIMIT 1").fetchone()
+    print(f" Exemplo CNAE: {cnae}")
     
-    tem_estabele = extrair_se_necessario('ESTABELE0.zip', 'estabelecimentos.csv')
-    tem_cnae = extrair_se_necessario('CNAECNV.zip', 'cnaes.csv')
+    # Conta quantos CNPJs entraram
+    qtd = con.execute("SELECT COUNT(*) FROM estabelecimentos").fetchone()[0]
+    print(f" Total de Empresas Importadas: {qtd}")
+except:
+    print(" Erro na conferência (mas se as tabelas foram criadas, tá valendo).")
 
-    con = duckdb.connect(DB_NAME)
-
-    # 1. Carregar Estabelecimentos
-    if tem_estabele:
-        print(" Importando estabelecimentos.csv...")
-        try:
-            # O SEGREDO ESTÁ AQUI: auto_detect=False
-            con.execute(f"""
-                CREATE OR REPLACE TABLE estabelecimentos AS 
-                SELECT 
-                    c0 || c1 || c2 as cnpj,
-                    c4 as nome_fantasia,
-                    c11 as cnae_principal,
-                    c19 as uf,
-                    c20 as municipio,
-                    '(' || c21 || ') ' || c22 as telefone,
-                    c27 as email
-                FROM read_csv(
-                    'dados/estabelecimentos.csv', 
-                    delim=';', 
-                    header=False, 
-                    columns={colunas_estabele}, 
-                    encoding='ISO8859_1', 
-                    quote='"',
-                    escape='"',
-                    auto_detect=False,
-                    null_padding=True
-                )
-            """)
-            print(" Tabela 'estabelecimentos' criada com sucesso!")
-        except Exception as e:
-            print(f" Erro Estabelecimentos: {e}")
-
-    # 2. Carregar CNAEs
-    if tem_cnae:
-        print(" Importando cnaes.csv...")
-        try:
-            con.execute(f"""
-                CREATE OR REPLACE TABLE cnaes AS 
-                SELECT codigo, descricao 
-                FROM read_csv(
-                    'dados/cnaes.csv', 
-                    delim=';', 
-                    header=False, 
-                    columns={colunas_cnae}, 
-                    encoding='ISO8859_1', 
-                    quote='"',
-                    escape='"',
-                    auto_detect=False,
-                    null_padding=True
-                )
-            """)
-            print(" Tabela 'cnaes' criada com sucesso!")
-        except Exception as e:
-            print(f" Erro CNAEs: {e}")
-
-    con.close()
-    print("\n FIM! Agora TEM que ir.")
-
-if __name__ == "__main__":
-    criar_banco()
+con.close()
+print("\n Pode rodar o 'streamlit run app_leads.py'.")

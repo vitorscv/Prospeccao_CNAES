@@ -54,7 +54,7 @@ if botao_buscar:
         # Botão para baixar o CSV formatado
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="📥 Baixar Lista para Excel/CSV",
+            label=" Baixar Lista para Excel/CSV",
             data=csv,
             file_name=f"leads_{uf}_{cnaes_input[:10]}.csv",
             mime="text/csv",
@@ -63,4 +63,4 @@ if botao_buscar:
         st.warning("Nenhuma empresa encontrada com esses filtros no arquivo ESTABELE0.")
 
 # --- DICA PARA O USUÁRIO ---
-st.info("💡 Dica: Se precisar de cidades específicas, consulte o código do município no site do IBGE ou na base da Receita.")
+st.info(" Dica: Se precisar de cidades específicas, consulte o código do município no site do IBGE ou na base da Receita.")

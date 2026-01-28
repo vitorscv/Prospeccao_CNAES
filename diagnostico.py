@@ -3,7 +3,7 @@ import os
 def ler_topo_arquivo(caminho, linhas=3):
     print(f"\n--- Lendo arquivo: {caminho} ---")
     if not os.path.exists(caminho):
-        print("❌ Arquivo não encontrado!")
+        print(" Arquivo não encontrado!")
         return
 
     try:
