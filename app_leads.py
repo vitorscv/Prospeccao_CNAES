@@ -28,7 +28,7 @@ st.markdown("""
 st.title("🏹 Hunter Leads - Pantex")
 
 # ==========================================
-# 2. FUNÇÃO DE CONEXÃO
+# 2. FUNÇÃO DE CONEXÃO E AUXILIARES
 # ==========================================
 def get_connection():
     try:
@@ -36,6 +36,26 @@ def get_connection():
     except Exception as e:
         st.error(f"Erro ao conectar: {e}")
         return None
+
+# [NOVO] Função para buscar cidades no banco
+def get_cidades(uf_selecionada):
+    con = get_connection()
+    if con:
+        try:
+            # Busca apenas cidades que existem no estado selecionado
+            query = f"""
+                SELECT DISTINCT m.descricao 
+                FROM estabelecimentos e
+                JOIN municipios m ON e.municipio = m.codigo
+                WHERE e.uf = '{uf_selecionada}'
+                ORDER BY m.descricao
+            """
+            df = con.execute(query).df()
+            con.close()
+            return df['descricao'].tolist()
+        except:
+            return []
+    return []
 
 # ==========================================
 # 3. BARRA LATERAL (FILTROS)
@@ -47,6 +67,11 @@ with st.sidebar:
     estado = st.selectbox("Selecione o Estado Alvo:", 
                           ["BA", "SP", "RJ", "MG", "RS", "SC", "PR", "PE", "CE", "GO", "ES", "SE", "AL", "PB", "RN", "MA", "PI", "PA", "AM", "MT", "MS", "DF"])
     
+    # [NOVO] Lógica da Cidade
+    lista_cidades = get_cidades(estado)
+    lista_cidades.insert(0, "TODAS")
+    cidade = st.selectbox("Selecione a Cidade:", lista_cidades)
+
     codigo_cnae = st.text_input("Cole o Código CNAE:", placeholder="Ex: 0111301")
     
     st.markdown("---")
@@ -81,19 +106,44 @@ with aba1:
                 st.warning("Nenhum CNAE encontrado.")
 
 # --- ABA 2: Gerar Leads (Ouro) ---
+# --- ABA 2: Gerar Leads ---
 with aba2:
     st.header("Base de Empresas")
     
-    # Só executa se o botão lá da esquerda foi clicado
     if clicou_buscar:
-        if len(codigo_cnae) < 7:
-            st.error("⚠️ O código CNAE deve ter 7 dígitos numéricos.")
+        # 1. TRATAMENTO INTELIGENTE DOS CNAES
+        # Pega o texto, separa nas vírgulas e remove espaços em branco
+        lista_cnaes = [c.strip() for c in codigo_cnae.split(',') if c.strip()]
+        
+        if not lista_cnaes:
+            st.warning("⚠️ Digite pelo menos um código CNAE.")
         else:
             con = get_connection()
             if con:
-                with st.spinner(f"Minerando dados para {estado}..."):
+                # Define o local para mostrar na mensagem
+                local_busca = f"{cidade}-{estado}" if cidade != "TODAS" else f"Estado de {estado}"
+                
+                with st.spinner(f"Minerando dados em {local_busca}..."):
                     try:
-                        # Query Poderosa (CNAE + Estado + Contatos)
+                        # === LÓGICA DE FILTRO ===
+                        filtro_cidade_sql = ""
+                        
+                        # Se escolheu uma cidade específica
+                        if cidade != "TODAS":
+                            try:
+                                cidade_safe = cidade.replace("'", "''")
+                                q_cod = f"SELECT codigo FROM municipios WHERE descricao = '{cidade_safe}' LIMIT 1"
+                                res_cod = con.execute(q_cod).fetchone()
+                                if res_cod:
+                                    filtro_cidade_sql = f"AND estabelecimentos.municipio = '{res_cod[0]}'"
+                            except:
+                                pass
+
+                        # === O PULO DO GATO: FORMATAR PARA SQL ===
+                        # Transforma a lista ['123', '456'] no texto "'123', '456'"
+                        cnaes_para_sql = "', '".join(lista_cnaes)
+
+                        # Query Atualizada (Mudamos de = para IN)
                         query_leads = f"""
                             SELECT 
                                 nome_fantasia AS "Nome Fantasia",
@@ -101,53 +151,94 @@ with aba2:
                                 ddd_1 || ' ' || telefone_1 AS "Telefone Principal",
                                 ddd_2 || ' ' || telefone_2 AS "Telefone Secundário",
                                 correio_eletronico AS "E-mail",
-                                municipio AS "Cidade",
-                                uf AS "UF"
+                                m.descricao AS "Cidade",
+                                uf AS "UF",
+                                cnae_principal AS "CNAE"
                             FROM estabelecimentos 
-                            WHERE cnae_principal = '{codigo_cnae}' 
+                            LEFT JOIN municipios m ON estabelecimentos.municipio = m.codigo
+                            WHERE cnae_principal IN ('{cnaes_para_sql}') 
                             AND uf = '{estado}'
                             AND situacao_cadastral = '02'
+                            {filtro_cidade_sql}
                             LIMIT 1000
                         """
+                        
                         df_leads = con.execute(query_leads).df()
                         con.close()
                         
                         if not df_leads.empty:
-                            st.success(f"✅ Sucesso! Encontramos {len(df_leads)} empresas ativas.")
+                            st.success(f"✅ Sucesso! Encontramos {len(df_leads)} empresas com esses CNAEs.")
                             
-                            # --- MÉTRICAS ---
+                            # Métricas
                             col1, col2, col3 = st.columns(3)
-                            
                             col1.metric("Total Encontrado", len(df_leads))
-                            
-                            # Conta quantos tem email preenchido
-                            qtd_email = df_leads[df_leads["E-mail"].notnull()].shape[0]
-                            col2.metric("Com E-mail", qtd_email)
-                            
-                            # Conta quantos tem telefone secundário
-                            qtd_tel2 = df_leads[df_leads["Telefone Secundário"].notnull()].shape[0]
-                            col3.metric("Com Telefone Extra", qtd_tel2)
-                            
+                            col2.metric("Com E-mail", df_leads["E-mail"].notnull().sum())
+                            col3.metric("Com Telefone Extra", df_leads["Telefone Secundário"].notnull().sum())
                             st.divider()
-                            # ----------------
 
                             # Tabela
                             st.dataframe(df_leads, hide_index=True, use_container_width=True)
                             
                             # Download
                             csv = df_leads.to_csv(index=False, sep=';', encoding='utf-8-sig')
-                            st.download_button(
-                                label="📥 BAIXAR PLANILHA",
-                                data=csv,
-                                file_name=f"Leads_{codigo_cnae}_{estado}.csv",
-                                mime="text/csv"
-                            )
+                            nome_arquivo = f"Leads_Multiplos_{local_busca}.csv"
+                            st.download_button(label="📥 BAIXAR PLANILHA", data=csv, file_name=nome_arquivo, mime="text/csv")
                         else:
-                            st.warning("Nenhuma empresa encontrada com esses filtros.")
+                            st.warning(f"Nenhuma empresa encontrada em {local_busca} para os CNAEs informados.")
                             
                     except Exception as e:
                         st.error(f"Erro na extração: {e}")
 
-# --- ABA 3: Futuro ---
+    # --- ABA 3: Dashboard de Mercado (Inteligência) ---
 with aba3:
-    st.info("🚧 Em breve: Gráficos e Estatísticas de Mercado")
+    st.header("📈 Inteligência de Mercado")
+    st.info("Analise onde estão as maiores oportunidades.")
+
+    # Aproveita os filtros que já estão na barra lateral
+    if st.button("📊 ANALISAR MERCADO"):
+        if not codigo_cnae:
+            st.warning("⚠️ Digite um CNAE na barra lateral primeiro.")
+        else:
+            con = get_connection()
+            if con:
+                with st.spinner(f"Analisando o mercado em {estado}..."):
+                    try:
+                        # 1. Trata os CNAES (igual na aba 2)
+                        lista_cnaes = [c.strip() for c in codigo_cnae.split(',') if c.strip()]
+                        cnaes_sql = "', '".join(lista_cnaes)
+                        
+                        # 2. Query de Agrupamento (Group By)
+                        # Conta quantas empresas existem por cidade e ordena do maior para o menor
+                        query_dashboard = f"""
+                            SELECT 
+                                m.descricao AS "Cidade",
+                                COUNT(*) AS "Total de Empresas"
+                            FROM estabelecimentos
+                            LEFT JOIN municipios m ON estabelecimentos.municipio = m.codigo
+                            WHERE cnae_principal IN ('{cnaes_sql}')
+                            AND uf = '{estado}'
+                            AND situacao_cadastral = '02'
+                            GROUP BY m.descricao
+                            ORDER BY "Total de Empresas" DESC
+                            LIMIT 10
+                        """
+                        
+                        df_dash = con.execute(query_dashboard).df()
+                        con.close()
+
+                        if not df_dash.empty:
+                            # Mostra números gerais
+                            total_estado = df_dash["Total de Empresas"].sum()
+                            st.metric(label=f"Top 10 Cidades em {estado}", value=total_estado)
+                            
+                            # GRÁFICO DE BARRAS (Simples e bonito)
+                            st.bar_chart(df_dash.set_index("Cidade"))
+                            
+                            # Mostra a tabelinha também
+                            with st.expander("Ver dados detalhados"):
+                                st.dataframe(df_dash, use_container_width=True)
+                        else:
+                            st.warning("Nenhum dado encontrado para gerar gráficos.")
+
+                    except Exception as e:
+                        st.error(f"Erro ao gerar dashboard: {e}")
