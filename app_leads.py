@@ -2,10 +2,11 @@ import streamlit as st
 import duckdb
 import pandas as pd
 
-# Configuração da Página (Modo Tela Cheia)
-st.set_page_config(page_title="Prospecção Pantex", page_icon="🏹", layout="wide")
+# ==========================================
+# 1. CONFIGURAÇÃO E ESTILO
+# ==========================================
+st.set_page_config(page_title="Hunter Leads", page_icon="🏹", layout="wide")
 
-# Estilo Personalizado (Botão Vermelho Pantex e Tabelas maiores)
 st.markdown("""
 <style>
     .stButton>button {
@@ -13,108 +14,140 @@ st.markdown("""
         background-color: #FF4B4B;
         color: white;
         font-weight: bold;
+        border-radius: 10px;
     }
     div[data-testid="stDataFrame"] {
         width: 100%;
     }
+    div[data-testid="stMetricValue"] {
+        font-size: 24px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("🏹 Sistema de Prospecção Pantex")
-st.markdown("### Ferramenta de Geração de Leads Qualificados")
+st.title("🏹 Hunter Leads - Pantex")
 
-# --- 1. CONEXÃO COM O BANCO ---
+# ==========================================
+# 2. FUNÇÃO DE CONEXÃO
+# ==========================================
 def get_connection():
     try:
-        # read_only=True é vital para não travar o banco
         return duckdb.connect('hunter_leads.db', read_only=True)
     except Exception as e:
-        st.error(f"Erro ao conectar no banco de dados. Verifique se o arquivo 'hunter_leads.db' existe.\nErro: {e}")
+        st.error(f"Erro ao conectar: {e}")
         return None
 
-# --- 2. BUSCA DE CÓDIGO CNAE ---
-st.info("Passo 1: Descubra o código da atividade econômica")
-termo_busca = st.text_input("Digite a atividade (ex: Arroz, Gesso, Padaria, Construção):", placeholder="Digite aqui...")
-
-if termo_busca:
-    con = get_connection()
-    if con:
-        # Busca inteligente (ILIKE ignora maiúsculas/minúsculas)
-        query = f"""
-            SELECT codigo, descricao 
-            FROM cnaes 
-            WHERE descricao ILIKE '%{termo_busca}%' 
-            LIMIT 15
-        """
-        results = con.execute(query).df()
-        con.close()
-        
-        if not results.empty:
-            st.dataframe(results, hide_index=True, use_container_width=True)
-        else:
-            st.warning("Nenhum CNAE encontrado. Tente um termo mais genérico.")
-
-st.markdown("---")
-
-# --- 3. GERAR LEADS (AGORA COM EMAIL E TELEFONE 2) ---
-st.info("Passo 2: Gere a lista de contatos completa")
-
-col1, col2 = st.columns(2)
-
-with col1:
+# ==========================================
+# 3. BARRA LATERAL (FILTROS)
+# ==========================================
+with st.sidebar:
+    st.image("https://cdn-icons-png.flaticon.com/512/2518/2518048.png", width=100)
+    st.header("Filtros de Busca")
+    
     estado = st.selectbox("Selecione o Estado Alvo:", 
                           ["BA", "SP", "RJ", "MG", "RS", "SC", "PR", "PE", "CE", "GO", "ES", "SE", "AL", "PB", "RN", "MA", "PI", "PA", "AM", "MT", "MS", "DF"])
+    
+    codigo_cnae = st.text_input("Cole o Código CNAE:", placeholder="Ex: 0111301")
+    
+    st.markdown("---")
+    
+    # Variável que guarda o clique do botão
+    clicou_buscar = st.button("🚀 GERAR LISTA DE PROSPECÇÃO")
 
-with col2:
-    codigo_cnae = st.text_input("Cole o Código CNAE (Apenas números):", placeholder="Ex: 0111301")
+# ==========================================
+# 4. ÁREA PRINCIPAL (ABAS)
+# ==========================================
+# As abas ficam FORA do sidebar para ocupar a tela toda
+aba1, aba2, aba3 = st.tabs(["🔍 Descobrir Código", "📊 Gerar Leads", "📈 Dashboard"])
 
-if st.button("🚀 GERAR LISTA DE PROSPECÇÃO"):
-    if len(codigo_cnae) < 7:
-        st.error(" O código CNAE deve ter 7 dígitos numéricos.")
-    else:
+# --- ABA 1: Descobrir o CNAE ---
+with aba1:
+    st.header("Encontre o código da atividade")
+    st.info("Passo 1: Digite o nome da atividade para descobrir o código.")
+    
+    termo_busca = st.text_input("Digite a atividade (ex: Arroz, Gesso, Padaria):")
+
+    if termo_busca:
         con = get_connection()
         if con:
-            with st.spinner(f" Minérando dados da Receita Federal para {estado}..."):
-                try:
-                    # AQUI É O PULO DO GATO: Trazendo E-mail e Telefone Secundário
-                    query_leads = f"""
-                        SELECT 
-                            nome_fantasia AS "Nome Fantasia",
-                            cnpj_basico || cnpj_ordem || cnpj_dv AS "CNPJ",
-                            ddd_1 || ' ' || telefone_1 AS "Telefone Principal",
-                            ddd_2 || ' ' || telefone_2 AS "Telefone Secundário",
-                            correio_eletronico AS "E-mail",
-                            tipo_logradouro || ' ' || logradouro || ', ' || numero || ' ' || complemento AS "Endereço",
-                            bairro AS "Bairro",
-                            municipio AS "Cidade",
-                            uf AS "UF"
-                        FROM estabelecimentos 
-                        WHERE cnae_principal = '{codigo_cnae}' 
-                        AND uf = '{estado}'
-                        AND situacao_cadastral = '02' -- Filtra apenas empresas ATIVAS
-                        LIMIT 500
-                    """
-                    
-                    df_leads = con.execute(query_leads).df()
-                    con.close()
-                    
-                    if not df_leads.empty:
-                        total = len(df_leads)
-                        st.success(f" Sucesso! Encontramos {total} empresas ativas.")
+            # Query simples para achar o código
+            query = f"SELECT codigo, descricao FROM cnaes WHERE descricao ILIKE '%{termo_busca}%' LIMIT 15"
+            results = con.execute(query).df()
+            con.close()
+            
+            if not results.empty:
+                st.dataframe(results, hide_index=True, use_container_width=True)
+            else:
+                st.warning("Nenhum CNAE encontrado.")
+
+# --- ABA 2: Gerar Leads (Ouro) ---
+with aba2:
+    st.header("Base de Empresas")
+    
+    # Só executa se o botão lá da esquerda foi clicado
+    if clicou_buscar:
+        if len(codigo_cnae) < 7:
+            st.error("⚠️ O código CNAE deve ter 7 dígitos numéricos.")
+        else:
+            con = get_connection()
+            if con:
+                with st.spinner(f"Minerando dados para {estado}..."):
+                    try:
+                        # Query Poderosa (CNAE + Estado + Contatos)
+                        query_leads = f"""
+                            SELECT 
+                                nome_fantasia AS "Nome Fantasia",
+                                cnpj_basico || cnpj_ordem || cnpj_dv AS "CNPJ",
+                                ddd_1 || ' ' || telefone_1 AS "Telefone Principal",
+                                ddd_2 || ' ' || telefone_2 AS "Telefone Secundário",
+                                correio_eletronico AS "E-mail",
+                                municipio AS "Cidade",
+                                uf AS "UF"
+                            FROM estabelecimentos 
+                            WHERE cnae_principal = '{codigo_cnae}' 
+                            AND uf = '{estado}'
+                            AND situacao_cadastral = '02'
+                            LIMIT 1000
+                        """
+                        df_leads = con.execute(query_leads).df()
+                        con.close()
                         
-                        # Mostra a tabela na tela
-                        st.dataframe(df_leads, hide_index=True, use_container_width=True)
-                        
-                        # Botão de Download Turbinado
-                        csv = df_leads.to_csv(index=False, sep=';', encoding='utf-8-sig') # utf-8-sig para abrir certo no Excel
-                        st.download_button(
-                            label="📥 BAIXAR PLANILHA PARA EXCEL (.csv)",
-                            data=csv,
-                            file_name=f"Leads_CNAE_{codigo_cnae}_{estado}.csv",
-                            mime="text/csv"
-                        )
-                    else:
-                        st.warning(" Nenhuma empresa ativa encontrada com este filtro. Tente outro Estado ou CNAE.")
-                
-                except Exception as e:
-                    st.error(f"Erro na extração: {e}")
+                        if not df_leads.empty:
+                            st.success(f"✅ Sucesso! Encontramos {len(df_leads)} empresas ativas.")
+                            
+                            # --- MÉTRICAS ---
+                            col1, col2, col3 = st.columns(3)
+                            
+                            col1.metric("Total Encontrado", len(df_leads))
+                            
+                            # Conta quantos tem email preenchido
+                            qtd_email = df_leads[df_leads["E-mail"].notnull()].shape[0]
+                            col2.metric("Com E-mail", qtd_email)
+                            
+                            # Conta quantos tem telefone secundário
+                            qtd_tel2 = df_leads[df_leads["Telefone Secundário"].notnull()].shape[0]
+                            col3.metric("Com Telefone Extra", qtd_tel2)
+                            
+                            st.divider()
+                            # ----------------
+
+                            # Tabela
+                            st.dataframe(df_leads, hide_index=True, use_container_width=True)
+                            
+                            # Download
+                            csv = df_leads.to_csv(index=False, sep=';', encoding='utf-8-sig')
+                            st.download_button(
+                                label="📥 BAIXAR PLANILHA",
+                                data=csv,
+                                file_name=f"Leads_{codigo_cnae}_{estado}.csv",
+                                mime="text/csv"
+                            )
+                        else:
+                            st.warning("Nenhuma empresa encontrada com esses filtros.")
+                            
+                    except Exception as e:
+                        st.error(f"Erro na extração: {e}")
+
+# --- ABA 3: Futuro ---
+with aba3:
+    st.info("🚧 Em breve: Gráficos e Estatísticas de Mercado")
