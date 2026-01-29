@@ -9,3 +9,4 @@ hunter_leads.db
 
 # Ignorar arquivos temporários do Python
 __pycache__/
+

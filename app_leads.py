@@ -1,9 +1,33 @@
 import streamlit as st
 import duckdb
 import pandas as pd
+from io import BytesIO
+
+# --- FUNÇÃO DE EXCEL CORRIGIDA ---
+def gerar_excel_formatado(df):
+    output = BytesIO() # Corrigido: BytesIO com B e I e O maiúsculos
+
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer: # Corrigido: ExcelWriter
+        df.to_excel(writer, index=False, sheet_name='Leads') # Corrigido: sheet_name
+
+        workbook = writer.book
+        worksheet = writer.sheets['Leads'] # Corrigido: variável worksheet
+
+        formato_texto = workbook.add_format({'num_format': '@', 'align': 'left', 'valign': 'vcenter'})
+
+        # Ajustes de largura 
+        for i, col in enumerate(df.columns):
+            # Corrigido: lógica do max estava quebrada em várias linhas
+            tam_max = max(
+                df[col].astype(str).map(len).max(),
+                len(str(col))
+            )
+            worksheet.set_column(i, i, tam_max + 2, formato_texto)
+
+    return output.getvalue() 
+
 
 # 1. CONFIGURAÇÃO E ESTILO
-
 st.set_page_config(page_title="Hunter Leads", page_icon="🏹", layout="wide")
 
 st.markdown("""
@@ -28,7 +52,6 @@ st.title("🏹 Hunter Leads - Pantex")
 
 
 # 2. FUNÇÃO DE CONEXÃO E AUXILIARES
-
 def get_connection():
     try:
         return duckdb.connect('hunter_leads.db', read_only=True)
@@ -58,7 +81,6 @@ def get_cidades(uf_selecionada):
 
 
 # 3. BARRA LATERAL (FILTROS)
-
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/107/107799.png", width=100)
     st.header("Filtros de Busca")
@@ -79,8 +101,6 @@ with st.sidebar:
     clicou_buscar = st.button(" GERAR LISTA DE PROSPECÇÃO")
 
 # 4. ÁREA PRINCIPAL (ABAS)
-
-
 aba1, aba2, aba3 = st.tabs(["🔍 Descobrir Código", "📊 Gerar Leads", "📈 Dashboard"])
 
 # ABA 1: Descobrir o CNAE 
@@ -139,7 +159,7 @@ with aba2:
                         # FORMATAR PARA SQL
                         cnaes_para_sql = "', '".join(lista_cnaes)
 
-                        # Query Atualizada (Mudamos de = para IN)
+                        # Query Atualizada
                         query_leads = f"""
                             SELECT 
                                 nome_fantasia AS "Nome Fantasia",
@@ -175,17 +195,28 @@ with aba2:
                             # Tabela
                             st.dataframe(df_leads, hide_index=True, use_container_width=True)
                             
-                            # Download
-                            csv = df_leads.to_csv(index=False, sep=';', encoding='utf-8-sig')
-                            nome_arquivo = f"Leads_Multiplos_{local_busca}.csv"
-                            st.download_button(label="📥 BAIXAR PLANILHA", data=csv, file_name=nome_arquivo, mime="text/csv")
+                            # --- TRATAMENTO DO CNPJ E DOWNLOAD ---
+                            # Importante: Use df_leads aqui, não df_filtrado
+                            if 'CNPJ' in df_leads.columns:
+                                df_leads['CNPJ'] = df_leads['CNPJ'].astype(str).str.replace(r'\.0$', '', regex=True)
+
+                            # --- GERA O ARQUIVO BONITÃO ---
+                            excel_pronto = gerar_excel_formatado(df_leads)
+
+                            # --- BOTÃO DE DOWNLOAD ---
+                            st.download_button(
+                                label="📥 Baixar Planilha Formatada",
+                                data=excel_pronto,
+                                file_name="Leads_Formatados.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                            )
                         else:
                             st.warning(f"Nenhuma empresa encontrada em {local_busca} para os CNAEs informados.")
-                            
+                                                
                     except Exception as e:
                         st.error(f"Erro na extração: {e}")
 
-    # ABA 3: Dashboard de Mercado
+# ABA 3: Dashboard de Mercado
 with aba3:
     st.header("📈 Inteligência de Mercado")
     st.info("Analise onde estão as maiores oportunidades.")
@@ -203,8 +234,7 @@ with aba3:
                         lista_cnaes = [c.strip() for c in codigo_cnae.split(',') if c.strip()]
                         cnaes_sql = "', '".join(lista_cnaes)
                         
-                        # 2. Query de Agrupamento (Group By)
-                        # Conta quantas empresas existem por cidade e ordena do maior para o menor
+                        # 2. Query de Agrupamento
                         query_dashboard = f"""
                             SELECT 
                                 m.descricao AS "Cidade",
