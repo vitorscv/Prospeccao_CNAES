@@ -60,7 +60,7 @@ if botao_buscar:
             mime="text/csv",
         )
     else:
-        st.warning("Nenhuma empresa encontrada com esses filtros no arquivo ESTABELE0.")
+        st.warning("Nenhuma empresa encontrada com esses filtros no arquivo.")
 
 # --- DICA PARA O USUÁRIO ---
 st.info(" Dica: Se precisar de cidades específicas, consulte o código do município no site do IBGE ou na base da Receita.")

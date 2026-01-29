@@ -38,7 +38,7 @@ try:
 except Exception as e:
     print(f" Erro CNAES: {e}")
 
-# 4. Importar Estabelecimentos (Com ignore_errors=true)
+# 4. Importar Estabelecimentos 
 print(" Processando Estabelecimentos...")
 try:
     con.execute(f"""

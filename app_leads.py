@@ -2,9 +2,8 @@ import streamlit as st
 import duckdb
 import pandas as pd
 
-# ==========================================
 # 1. CONFIGURAÇÃO E ESTILO
-# ==========================================
+
 st.set_page_config(page_title="Hunter Leads", page_icon="🏹", layout="wide")
 
 st.markdown("""
@@ -27,9 +26,9 @@ st.markdown("""
 
 st.title("🏹 Hunter Leads - Pantex")
 
-# ==========================================
+
 # 2. FUNÇÃO DE CONEXÃO E AUXILIARES
-# ==========================================
+
 def get_connection():
     try:
         return duckdb.connect('hunter_leads.db', read_only=True)
@@ -37,7 +36,7 @@ def get_connection():
         st.error(f"Erro ao conectar: {e}")
         return None
 
-# [NOVO] Função para buscar cidades no banco
+# Função para buscar cidades no banco
 def get_cidades(uf_selecionada):
     con = get_connection()
     if con:
@@ -57,17 +56,17 @@ def get_cidades(uf_selecionada):
             return []
     return []
 
-# ==========================================
+
 # 3. BARRA LATERAL (FILTROS)
-# ==========================================
+
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2518/2518048.png", width=100)
+    st.image("https://cdn-icons-png.flaticon.com/512/107/107799.png", width=100)
     st.header("Filtros de Busca")
     
     estado = st.selectbox("Selecione o Estado Alvo:", 
                           ["BA", "SP", "RJ", "MG", "RS", "SC", "PR", "PE", "CE", "GO", "ES", "SE", "AL", "PB", "RN", "MA", "PI", "PA", "AM", "MT", "MS", "DF"])
     
-    # [NOVO] Lógica da Cidade
+    # Lógica da Cidade
     lista_cidades = get_cidades(estado)
     lista_cidades.insert(0, "TODAS")
     cidade = st.selectbox("Selecione a Cidade:", lista_cidades)
@@ -77,15 +76,14 @@ with st.sidebar:
     st.markdown("---")
     
     # Variável que guarda o clique do botão
-    clicou_buscar = st.button("🚀 GERAR LISTA DE PROSPECÇÃO")
+    clicou_buscar = st.button(" GERAR LISTA DE PROSPECÇÃO")
 
-# ==========================================
 # 4. ÁREA PRINCIPAL (ABAS)
-# ==========================================
-# As abas ficam FORA do sidebar para ocupar a tela toda
+
+
 aba1, aba2, aba3 = st.tabs(["🔍 Descobrir Código", "📊 Gerar Leads", "📈 Dashboard"])
 
-# --- ABA 1: Descobrir o CNAE ---
+# ABA 1: Descobrir o CNAE 
 with aba1:
     st.header("Encontre o código da atividade")
     st.info("Passo 1: Digite o nome da atividade para descobrir o código.")
@@ -105,14 +103,13 @@ with aba1:
             else:
                 st.warning("Nenhum CNAE encontrado.")
 
-# --- ABA 2: Gerar Leads (Ouro) ---
-# --- ABA 2: Gerar Leads ---
+
+#  ABA 2: Gerar Leads 
 with aba2:
     st.header("Base de Empresas")
     
     if clicou_buscar:
         # 1. TRATAMENTO INTELIGENTE DOS CNAES
-        # Pega o texto, separa nas vírgulas e remove espaços em branco
         lista_cnaes = [c.strip() for c in codigo_cnae.split(',') if c.strip()]
         
         if not lista_cnaes:
@@ -139,8 +136,7 @@ with aba2:
                             except:
                                 pass
 
-                        # === O PULO DO GATO: FORMATAR PARA SQL ===
-                        # Transforma a lista ['123', '456'] no texto "'123', '456'"
+                        # FORMATAR PARA SQL
                         cnaes_para_sql = "', '".join(lista_cnaes)
 
                         # Query Atualizada (Mudamos de = para IN)
@@ -189,7 +185,7 @@ with aba2:
                     except Exception as e:
                         st.error(f"Erro na extração: {e}")
 
-    # --- ABA 3: Dashboard de Mercado (Inteligência) ---
+    # ABA 3: Dashboard de Mercado
 with aba3:
     st.header("📈 Inteligência de Mercado")
     st.info("Analise onde estão as maiores oportunidades.")
@@ -231,7 +227,7 @@ with aba3:
                             total_estado = df_dash["Total de Empresas"].sum()
                             st.metric(label=f"Top 10 Cidades em {estado}", value=total_estado)
                             
-                            # GRÁFICO DE BARRAS (Simples e bonito)
+                            # GRÁFICO DE BARRAS 
                             st.bar_chart(df_dash.set_index("Cidade"))
                             
                             # Mostra a tabelinha também

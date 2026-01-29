@@ -4,7 +4,7 @@ import os
 import time
 import zipfile
 
-print("--- 🛡️ IMPORTAÇÃO BLINDADA (VIA PANDAS CHUNKS) ---")
+print("---  IMPORTAÇÃO (VIA PANDAS CHUNKS) ---")
 
 # 1. Configuração Inicial
 db_file = 'hunter_leads.db'
