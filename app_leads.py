@@ -3,21 +3,21 @@ import duckdb
 import pandas as pd
 from io import BytesIO
 
-# --- FUNÇÃO DE EXCEL CORRIGIDA ---
-def gerar_excel_formatado(df):
-    output = BytesIO() # Corrigido: BytesIO com B e I e O maiúsculos
 
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer: # Corrigido: ExcelWriter
-        df.to_excel(writer, index=False, sheet_name='Leads') # Corrigido: sheet_name
+def gerar_excel_formatado(df):
+    output = BytesIO() 
+
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer: 
+        df.to_excel(writer, index=False, sheet_name='Leads') 
 
         workbook = writer.book
-        worksheet = writer.sheets['Leads'] # Corrigido: variável worksheet
+        worksheet = writer.sheets['Leads'] 
 
         formato_texto = workbook.add_format({'num_format': '@', 'align': 'left', 'valign': 'vcenter'})
 
         # Ajustes de largura 
         for i, col in enumerate(df.columns):
-            # Corrigido: lógica do max estava quebrada em várias linhas
+            
             tam_max = max(
                 df[col].astype(str).map(len).max(),
                 len(str(col))
@@ -100,7 +100,7 @@ with st.sidebar:
     # Variável que guarda o clique do botão
     clicou_buscar = st.button(" GERAR LISTA DE PROSPECÇÃO")
 
-# 4. ÁREA PRINCIPAL (ABAS)
+# 4. ÁREA PRINCIPAL 
 aba1, aba2, aba3 = st.tabs(["🔍 Descobrir Código", "📊 Gerar Leads", "📈 Dashboard"])
 
 # ABA 1: Descobrir o CNAE 
@@ -142,7 +142,7 @@ with aba2:
                 
                 with st.spinner(f"Minerando dados em {local_busca}..."):
                     try:
-                        # === LÓGICA DE FILTRO ===
+                        # LÓGICA DE FILTRO
                         filtro_cidade_sql = ""
                         
                         # Se escolheu uma cidade específica
@@ -195,15 +195,14 @@ with aba2:
                             # Tabela
                             st.dataframe(df_leads, hide_index=True, use_container_width=True)
                             
-                            # --- TRATAMENTO DO CNPJ E DOWNLOAD ---
-                            # Importante: Use df_leads aqui, não df_filtrado
+                            # TRATAMENTO DO CNPJ E DOWNLOAD
                             if 'CNPJ' in df_leads.columns:
                                 df_leads['CNPJ'] = df_leads['CNPJ'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-                            # --- GERA O ARQUIVO BONITÃO ---
+                            # gerar o arquivo já formatado
                             excel_pronto = gerar_excel_formatado(df_leads)
 
-                            # --- BOTÃO DE DOWNLOAD ---
+                            # BOTÃO DE DOWNLOAD
                             st.download_button(
                                 label="📥 Baixar Planilha Formatada",
                                 data=excel_pronto,
@@ -221,7 +220,7 @@ with aba3:
     st.header("📈 Inteligência de Mercado")
     st.info("Analise onde estão as maiores oportunidades.")
 
-    # Aproveita os filtros que já estão na barra lateral
+    
     if st.button("📊 ANALISAR MERCADO"):
         if not codigo_cnae:
             st.warning("⚠️ Digite um CNAE na barra lateral primeiro.")
@@ -230,7 +229,7 @@ with aba3:
             if con:
                 with st.spinner(f"Analisando o mercado em {estado}..."):
                     try:
-                        # 1. Trata os CNAES (igual na aba 2)
+                        # 1. Trata os CNAES
                         lista_cnaes = [c.strip() for c in codigo_cnae.split(',') if c.strip()]
                         cnaes_sql = "', '".join(lista_cnaes)
                         
@@ -260,7 +259,7 @@ with aba3:
                             # GRÁFICO DE BARRAS 
                             st.bar_chart(df_dash.set_index("Cidade"))
                             
-                            # Mostra a tabelinha também
+                            # tabela 
                             with st.expander("Ver dados detalhados"):
                                 st.dataframe(df_dash, use_container_width=True)
                         else:
