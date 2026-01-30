@@ -3,21 +3,21 @@ import duckdb
 import pandas as pd
 from io import BytesIO
 
-# --- FUNÇÃO DE EXCEL CORRIGIDA ---
-def gerar_excel_formatado(df):
-    output = BytesIO() # Corrigido: BytesIO com B e I e O maiúsculos
 
-    with pd.ExcelWriter(output, engine='xlsxwriter') as writer: # Corrigido: ExcelWriter
-        df.to_excel(writer, index=False, sheet_name='Leads') # Corrigido: sheet_name
+def gerar_excel_formatado(df):
+    output = BytesIO() 
+
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer: 
+        df.to_excel(writer, index=False, sheet_name='Leads') 
 
         workbook = writer.book
-        worksheet = writer.sheets['Leads'] # Corrigido: variável worksheet
+        worksheet = writer.sheets['Leads'] 
 
         formato_texto = workbook.add_format({'num_format': '@', 'align': 'left', 'valign': 'vcenter'})
 
         # Ajustes de largura 
         for i, col in enumerate(df.columns):
-            # Corrigido: lógica do max estava quebrada em várias linhas
+            
             tam_max = max(
                 df[col].astype(str).map(len).max(),
                 len(str(col))
@@ -80,7 +80,7 @@ def get_cidades(uf_selecionada):
     return []
 
 
-# 3. BARRA LATERAL (FILTROS)
+# 3. BARRA LATERAL 
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/107/107799.png", width=100)
     st.header("Filtros de Busca")
@@ -97,7 +97,7 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Variável que guarda o clique do botão
+    # Variável botão
     clicou_buscar = st.button(" GERAR LISTA DE PROSPECÇÃO")
 
 # 4. ÁREA PRINCIPAL (ABAS)
@@ -113,7 +113,7 @@ with aba1:
     if termo_busca:
         con = get_connection()
         if con:
-            # Query simples para achar o código
+            # Query 
             query = f"SELECT codigo, descricao FROM cnaes WHERE descricao ILIKE '%{termo_busca}%' LIMIT 15"
             results = con.execute(query).df()
             con.close()
@@ -142,10 +142,10 @@ with aba2:
                 
                 with st.spinner(f"Minerando dados em {local_busca}..."):
                     try:
-                        # === LÓGICA DE FILTRO ===
+                        #LÓGICA DE FILTRO
                         filtro_cidade_sql = ""
                         
-                        # Se escolheu uma cidade específica
+                      
                         if cidade != "TODAS":
                             try:
                                 cidade_safe = cidade.replace("'", "''")
@@ -195,15 +195,15 @@ with aba2:
                             # Tabela
                             st.dataframe(df_leads, hide_index=True, use_container_width=True)
                             
-                            # --- TRATAMENTO DO CNPJ E DOWNLOAD ---
-                            # Importante: Use df_leads aqui, não df_filtrado
+                            # TRATAMENTO DO CNPJ E DOWNLOAD
+                            
                             if 'CNPJ' in df_leads.columns:
                                 df_leads['CNPJ'] = df_leads['CNPJ'].astype(str).str.replace(r'\.0$', '', regex=True)
 
-                            # --- GERA O ARQUIVO BONITÃO ---
+                            #  GERAR O ARQUIVO FORMATADO
                             excel_pronto = gerar_excel_formatado(df_leads)
 
-                            # --- BOTÃO DE DOWNLOAD ---
+                            # BOTÃO DE DOWNLOAD
                             st.download_button(
                                 label="📥 Baixar Planilha Formatada",
                                 data=excel_pronto,
@@ -221,7 +221,7 @@ with aba3:
     st.header("📈 Inteligência de Mercado")
     st.info("Analise onde estão as maiores oportunidades.")
 
-    # Aproveita os filtros que já estão na barra lateral
+   
     if st.button("📊 ANALISAR MERCADO"):
         if not codigo_cnae:
             st.warning("⚠️ Digite um CNAE na barra lateral primeiro.")
@@ -230,7 +230,7 @@ with aba3:
             if con:
                 with st.spinner(f"Analisando o mercado em {estado}..."):
                     try:
-                        # 1. Trata os CNAES (igual na aba 2)
+                        # 1. Trata os CNAES (
                         lista_cnaes = [c.strip() for c in codigo_cnae.split(',') if c.strip()]
                         cnaes_sql = "', '".join(lista_cnaes)
                         
@@ -260,7 +260,7 @@ with aba3:
                             # GRÁFICO DE BARRAS 
                             st.bar_chart(df_dash.set_index("Cidade"))
                             
-                            # Mostra a tabelinha também
+                            # Tabela
                             with st.expander("Ver dados detalhados"):
                                 st.dataframe(df_dash, use_container_width=True)
                         else:

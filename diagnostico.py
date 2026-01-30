@@ -1,7 +1,7 @@
 import os
 
 def ler_topo_arquivo(caminho, linhas=3):
-    print(f"\n--- Lendo arquivo: {caminho} ---")
+    print(f"\n Lendo arquivo: {caminho} ")
     if not os.path.exists(caminho):
         print(" Arquivo não encontrado!")
         return
@@ -14,6 +14,6 @@ def ler_topo_arquivo(caminho, linhas=3):
         print(f"Erro ao ler: {e}")
 
 # Executa o diagnóstico
-print("🔍 INICIANDO DIAGNÓSTICO DOS ARQUIVOS CSV...")
+print(" INICIANDO DIAGNÓSTICO DOS ARQUIVOS CSV...")
 ler_topo_arquivo('dados/estabelecimentos.csv')
 ler_topo_arquivo('dados/cnaes.csv')

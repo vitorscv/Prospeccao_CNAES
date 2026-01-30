@@ -23,11 +23,9 @@ try:
         z.extract(nome_arquivo, pasta_dados)
         arquivo_extraido = os.path.join(pasta_dados, nome_arquivo)
     
-    # 2. Leitura com Pandas (A mágica acontece aqui)
+    # 2. Leitura com Pandas 
     print(" 2. Pandas lendo e limpando CSV...")
-    # on_bad_lines='skip': Pula linhas quebradas
-    # dtype=str: Garante que o código '001' não vire '1'
-    # encoding='cp1252': O padrão do Windows/Receita
+    
     df = pd.read_csv(
         arquivo_extraido, 
         sep=';', 
@@ -45,12 +43,12 @@ try:
     con = duckdb.connect('hunter_leads.db')
     con.execute("DROP TABLE IF EXISTS municipios")
     
-    # O DuckDB aceita DataFrames do Pandas direto!
+    
     con.execute("CREATE TABLE municipios AS SELECT * FROM df")
     
     print(" SUCESSO TOTAL! Tabela criada.")
     
-    # Teste
+    
     teste = con.execute("SELECT descricao FROM municipios WHERE descricao LIKE '%FEIRA DE SANTANA%'").fetchone()
     print(f" Teste: {teste[0] if teste else 'Erro no teste'}")
 
@@ -62,7 +60,7 @@ except Exception as e:
 finally:
     if con:
         con.close()
-    # Limpa a bagunça
+   
     if arquivo_extraido and os.path.exists(arquivo_extraido):
         try:
             os.remove(arquivo_extraido)

@@ -93,7 +93,7 @@ except Exception as e:
 # 5. Conferência
 print("\n Conferência Final:")
 try:
-    # Mostra um CNAE para garantir
+    # Mostra um CNAE
     cnae = con.execute("SELECT * FROM cnaes LIMIT 1").fetchone()
     print(f" Exemplo CNAE: {cnae}")
     
