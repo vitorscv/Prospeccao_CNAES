@@ -1,49 +1,107 @@
-# Gerador de Leads Estratégicos
+# Prospecção de Leads por CNAE
 
-Aplicação Streamlit para gerar listas de prospecção baseadas em CNAE, Estado e Cidade.
+Ferramenta em **Python** para prospecção de empresas brasileiras usando **CNAE, UF e cidade**, a partir de dados públicos da Receita Federal (CNPJ).  
+Os dados são armazenados localmente em **DuckDB** e os resultados podem ser exportados em **CSV**.
 
-## Instalação
+---
 
-1. Instale as dependências:
-```powershell
-py -m pip install --user streamlit duckdb pandas
-```
+## Funcionalidades
 
-Ou usando o requirements.txt:
-```powershell
-py -m pip install --user -r requirements.txt
-```
+- Filtro por CNAE principal  
+- Filtro por UF e município  
+- Banco local DuckDB  
+- Processamento de arquivos grandes  
+- Exportação de leads em CSV  
+- Interface web com Streamlit  
+- Scripts de diagnóstico e atualização  
+- Automação via n8n  
 
-## Configuração
+---
 
-1. **Baixe o arquivo de dados da Receita Federal:**
-   - Acesse: https://dadosabertos.rfb.gov.br/CNPJ/
-   - Baixe o arquivo `ESTABELE0.zip` (ou outro arquivo ESTABELE)
-   - Coloque o arquivo na pasta `dados/`
+## Estrutura do Projeto
 
-2. **Estrutura de pastas:**
-```
-Prospeccao_CNAES/
-├── extrator.py
-├── requirements.txt
-├── dados/
-│   └── ESTABELE0.zip  ← Coloque o arquivo aqui
-└── base_leads.db      ← Será criado automaticamente
-```
+├── app_leads.py # Interface Streamlit
+├── extrator.py # Extração e tratamento dos dados
+├── utils_cnae.py # Funções auxiliares de CNAE
+├── setup_banco.py # Setup básico do banco
+├── setup_banco_completo.py # Setup completo (CNPJ + cidades)
+├── update_cidades.py # Atualização da base de municípios
+├── diagnostico.py # Diagnóstico da base de dados
+├── auto_atualizacao_n8n.py # Automação com n8n
+├── requirements.txt # Dependências
+├── base_leads.db # Gerado automaticamente
+└── dados/
+└── ESTABELE*.zip # Dados da Receita Federal
 
-## Execução
+yaml
+Copiar código
 
-Execute o aplicativo:
-```powershell
-streamlit run extrator.py
-```
+---
 
-O aplicativo abrirá no navegador em `http://localhost:8501`
+## Requisitos
 
-## Uso
+- Python **3.10+**
+- Pip
 
-1. Informe os CNAEs desejados (separados por vírgula)
-2. Selecione o Estado (UF)
-3. (Opcional) Informe o código do município
-4. Clique em "Gerar Lista de Prospecção"
-5. Baixe o resultado em CSV
+Instalação das dependências:
+
+```bash
+pip install -r requirements.txt
+Dados da Receita Federal
+Baixe os arquivos ESTABELE.zip* em:
+
+arduino
+Copiar código
+https://dadosabertos.rfb.gov.br/CNPJ/
+Coloque os arquivos na pasta:
+
+Copiar código
+dados/
+Setup do Banco de Dados
+Setup completo (recomendado):
+
+bash
+Copiar código
+python setup_banco_completo.py
+Executar a Aplicação
+bash
+Copiar código
+streamlit run app_leads.py
+Acesse no navegador:
+
+arduino
+Copiar código
+http://localhost:8501
+Como Usar
+Informe os CNAEs (separados por vírgula)
+
+Selecione a UF
+
+(Opcional) Selecione a cidade
+
+Gere os leads
+
+Exporte o CSV
+
+Diagnóstico (Opcional)
+bash
+Copiar código
+python diagnostico.py
+Observações
+Os dados utilizados são públicos (Receita Federal)
+
+Uso indicado para prospecção e análise B2B
+
+Respeite a LGPD ao entrar em contato com empresas
+
+markdown
+Copiar código
+
+---
+
+### Extras (opcional, mas deixa **nível profissional** 👇)
+
+Se quiser, recomendo adicionar:
+- `.gitignore` (Python padrão)
+- `LICENSE`
+- badges no topo (Python / Streamlit / DuckDB)
