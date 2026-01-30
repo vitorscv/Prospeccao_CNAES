@@ -1,9 +1,9 @@
 # Prospecção de Leads por CNAE
 
+
 Ferramenta em **Python** para prospecção de empresas brasileiras usando **CNAE, UF e cidade**, a partir de dados públicos da Receita Federal (CNPJ).  
 Os dados são armazenados localmente em **DuckDB** e os resultados podem ser exportados em **CSV**.
 
----
 
 ## Funcionalidades
 
@@ -17,7 +17,8 @@ Os dados são armazenados localmente em **DuckDB** e os resultados podem ser exp
 - Automação via n8n  
 
 ---
-2. **Estrutura de pastas:**
+## Estrutura de pastas
+
 ```
 Prospeccao_CNAES/
 ├── app_leads.py
@@ -61,7 +62,6 @@ py -m pip install --user -r requirements.txt
    - Baixe o arquivo `ESTABELECIMENTOS*.zip` 
    - Coloque o arquivo na pasta `dados/`
 
-
 ## Execução
 
 Execute o aplicativo:
@@ -71,41 +71,42 @@ streamlit run extrator.py
 
 O aplicativo abrirá no navegador em `http://localhost:8501`
 
+---
 
-##Setup do Banco de Dados
+## Setup do Banco de Dados
+
 Setup completo (recomendado):
 
+```powershell
 python setup_banco_completo.py
+```
 
-##Executar a Aplicação
+## Executar a Aplicação
 
+```powershell
 streamlit run app_leads.py
+```
 
 Acesse no navegador:
 
 http://localhost:8501
 
-##Como Usar
+## Como Usar
 
-Informe os CNAEs (separados por vírgula)
-Selecione a UF
-(Opcional) Selecione a cidade
-Gere os leads
-Exporte o CSV
+- Informe os CNAEs (separados por vírgula)
+- Selecione a UF
+- (Opcional) Selecione a cidade
+- Gere os leads
+- Exporte o CSV
 
-##Diagnóstico (Opcional)
+## Diagnóstico (Opcional)
 
+```powershell
 python diagnostico.py
+```
 
-##Observações
+## Observações
 
-Os dados utilizados são públicos (Receita Federal)
-Uso indicado para prospecção e análise B2B
-Respeite a LGPD ao entrar em contato com empresas
-
-
-
-
-
-
-
+- Os dados utilizados são públicos (Receita Federal)
+- Uso indicado para prospecção e análise B2B
+- Respeite a LGPD ao entrar em contato com empresas
