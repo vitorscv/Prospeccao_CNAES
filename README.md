@@ -1,98 +1,93 @@
 # Prospecção de Leads por CNAE
 
-Ferramenta em **Python** para prospecção de empresas brasileiras usando **CNAE, UF e cidade**, a partir de dados públicos da Receita Federal (CNPJ).  
-Os dados são armazenados localmente em **DuckDB** e os resultados podem ser exportados em **CSV**.
+Ferramenta em Python para prospecção de empresas brasileiras utilizando CNAE, UF e cidade, a partir de dados públicos da Receita Federal (CNPJ).
+Os dados são armazenados localmente em DuckDB e os resultados podem ser exportados em CSV.
 
 ---
 
-## Funcionalidades
+Funcionalidades
 
-- Filtro por CNAE principal  
-- Filtro por UF e município  
-- Banco local DuckDB  
-- Processamento de arquivos grandes  
-- Exportação de leads em CSV  
-- Interface web com Streamlit  
-- Scripts de diagnóstico e atualização  
-- Automação via n8n  
-
----
-
-## Estrutura do Projeto
-
-├── app_leads.py # Interface Streamlit
-├── extrator.py # Extração e tratamento dos dados
-├── utils_cnae.py # Funções auxiliares de CNAE
-├── setup_banco.py # Setup básico do banco
-├── setup_banco_completo.py # Setup completo (CNPJ + cidades)
-├── update_cidades.py # Atualização da base de municípios
-├── diagnostico.py # Diagnóstico da base de dados
-├── auto_atualizacao_n8n.py # Automação com n8n
-├── requirements.txt # Dependências
-├── base_leads.db # Gerado automaticamente
-└── dados/
-└── ESTABELE*.zip # Dados da Receita Federal
-
-yaml
-Copiar código
+- Filtro por CNAE principal
+- Filtro por UF e município
+- Banco local DuckDB
+- Processamento de arquivos grandes
+- Exportação de leads em CSV
+- Interface web com Streamlit
+- Scripts de diagnóstico e atualização
+- Automação via n8n
 
 ---
 
-## Requisitos
+Estrutura do Projeto
 
-- Python **3.10+**
-- Pip
+app_leads.py  
+extrator.py  
+utils_cnae.py  
+setup_banco.py  
+setup_banco_completo.py  
+update_cidades.py  
+diagnostico.py  
+auto_atualizacao_n8n.py  
+requirements.txt  
+base_leads.db  
+dados/ESTABELE*.zip  
+
+---
+
+Requisitos
+
+Python 3.10+  
+Pip  
 
 Instalação das dependências:
 
-```bash
 pip install -r requirements.txt
+
+---
+
 Dados da Receita Federal
-Baixe os arquivos ESTABELE.zip* em:
 
-arduino
-Copiar código
+Baixe os arquivos ESTABELE*.zip em:
 https://dadosabertos.rfb.gov.br/CNPJ/
+
 Coloque os arquivos na pasta:
-
-Copiar código
 dados/
+
+---
+
 Setup do Banco de Dados
-Setup completo (recomendado):
 
-bash
-Copiar código
 python setup_banco_completo.py
+
+---
+
 Executar a Aplicação
-bash
-Copiar código
+
 streamlit run app_leads.py
+
 Acesse no navegador:
-
-arduino
-Copiar código
 http://localhost:8501
+
+---
+
 Como Usar
-Informe os CNAEs (separados por vírgula)
 
-Selecione a UF
+Informe os CNAEs (separados por vírgula)  
+Selecione a UF  
+(Opcional) Selecione a cidade  
+Gere os leads  
+Exporte o CSV  
 
-(Opcional) Selecione a cidade
-
-Gere os leads
-
-Exporte o CSV
+---
 
 Diagnóstico (Opcional)
-bash
-Copiar código
+
 python diagnostico.py
+
+---
+
 Observações
-Os dados utilizados são públicos (Receita Federal)
 
-Uso indicado para prospecção e análise B2B
-
+Os dados utilizados são públicos (Receita Federal)  
+Uso indicado para prospecção e análise B2B  
 Respeite a LGPD ao entrar em contato com empresas
-
-markdown
-Copiar código
