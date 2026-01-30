@@ -17,24 +17,23 @@ Os dados são armazenados localmente em **DuckDB** e os resultados podem ser exp
 - Automação via n8n  
 
 ---
-
-## Estrutura do Projeto
-
-├── app_leads.py # Interface Streamlit
-├── extrator.py # Extração e tratamento dos dados
-├── utils_cnae.py # Funções auxiliares de CNAE
-├── setup_banco.py # Setup básico do banco
-├── setup_banco_completo.py # Setup completo (CNPJ + cidades)
-├── update_cidades.py # Atualização da base de municípios
-├── diagnostico.py # Diagnóstico da base de dados
-├── auto_atualizacao_n8n.py # Automação com n8n
-├── requirements.txt # Dependências
-├── base_leads.db # Gerado automaticamente
+2. **Estrutura de pastas:**
+```
+Prospeccao_CNAES/
+├── app_leads.py
+├── extrator.py
+├── utils_cnae.py
+├── setup_banco.py
+├── setup_banco_completo.py
+├── update_cidades.py
+├── diagnostico.py
+├── auto_atualizacao_n8n.py
+├── requirements.txt
+├── base_leads.db
 └── dados/
-└── ESTABELE*.zip # Dados da Receita Federal
+    └── ESTABELE*.zip
+```
 
-yaml
-Copiar código
 
 ---
 
@@ -43,65 +42,70 @@ Copiar código
 - Python **3.10+**
 - Pip
 
-Instalação das dependências:
+## Instalação
 
-```bash
-pip install -r requirements.txt
-Dados da Receita Federal
-Baixe os arquivos ESTABELE.zip* em:
+1. Instale as dependências:
+```powershell
+py -m pip install --user streamlit duckdb pandas
+```
 
-arduino
-Copiar código
-https://dadosabertos.rfb.gov.br/CNPJ/
-Coloque os arquivos na pasta:
+Ou usando o requirements.txt:
+```powershell
+py -m pip install --user -r requirements.txt
+```
 
-Copiar código
-dados/
-Setup do Banco de Dados
+## Configuração
+
+1. **Baixe o arquivo de dados da Receita Federal:**
+   - Acesse: https://dadosabertos.rfb.gov.br/CNPJ/
+   - Baixe o arquivo `ESTABELECIMENTOS*.zip` 
+   - Coloque o arquivo na pasta `dados/`
+
+
+## Execução
+
+Execute o aplicativo:
+```powershell
+streamlit run extrator.py
+```
+
+O aplicativo abrirá no navegador em `http://localhost:8501`
+
+
+##Setup do Banco de Dados
 Setup completo (recomendado):
 
-bash
-Copiar código
 python setup_banco_completo.py
-Executar a Aplicação
-bash
-Copiar código
+
+##Executar a Aplicação
+
 streamlit run app_leads.py
+
 Acesse no navegador:
 
-arduino
-Copiar código
 http://localhost:8501
-Como Usar
+
+##Como Usar
+
 Informe os CNAEs (separados por vírgula)
-
 Selecione a UF
-
 (Opcional) Selecione a cidade
-
 Gere os leads
-
 Exporte o CSV
 
-Diagnóstico (Opcional)
-bash
-Copiar código
+##Diagnóstico (Opcional)
+
 python diagnostico.py
-Observações
+
+##Observações
+
 Os dados utilizados são públicos (Receita Federal)
-
 Uso indicado para prospecção e análise B2B
-
 Respeite a LGPD ao entrar em contato com empresas
 
-markdown
-Copiar código
 
----
 
-### Extras (opcional, mas deixa **nível profissional** 👇)
 
-Se quiser, recomendo adicionar:
-- `.gitignore` (Python padrão)
-- `LICENSE`
-- badges no topo (Python / Streamlit / DuckDB)
+
+
+
