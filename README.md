@@ -18,19 +18,19 @@ Funcionalidades
 
 ---
 
-Estrutura do Projeto
-
-app_leads.py  
-extrator.py  
-utils_cnae.py  
-setup_banco.py  
-setup_banco_completo.py  
-update_cidades.py  
-diagnostico.py  
-auto_atualizacao_n8n.py  
-requirements.txt  
-base_leads.db  
-dados/ESTABELE*.zip  
+Prospeccao_CNAES/
+├── app_leads.py
+├── extrator.py
+├── utils_cnae.py
+├── setup_banco.py
+├── setup_banco_completo.py
+├── update_cidades.py
+├── diagnostico.py
+├── auto_atualizacao_n8n.py
+├── requirements.txt
+├── base_leads.db
+└── dados/
+    └── ESTABELE*.zip
 
 ---
 
