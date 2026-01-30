@@ -3,7 +3,7 @@
 
 Ferramenta em **Python** para prospecção de empresas brasileiras usando **CNAE, UF e cidade**, a partir de dados públicos da Receita Federal (CNPJ).  
 Os dados são armazenados localmente em **DuckDB** e os resultados podem ser exportados em **CSV**.
----
+
 
 ## Funcionalidades
 
@@ -17,7 +17,7 @@ Os dados são armazenados localmente em **DuckDB** e os resultados podem ser exp
 - Automação via n8n  
 
 ---
-2. **Estrutura de pastas:**
+ **Estrutura de pastas:**
 ```
 Prospeccao_CNAES/
 ├── app_leads.py
@@ -71,10 +71,10 @@ streamlit run extrator.py
 
 O aplicativo abrirá no navegador em `http://localhost:8501`
 
-
-##Setup do Banco de Dados
+---
+**Setup do Banco de Dados**
 Setup completo (recomendado):
-
+---
 python setup_banco_completo.py
 
 ##Executar a Aplicação
@@ -95,9 +95,10 @@ Exporte o CSV
 
 ##Diagnóstico (Opcional)
 
+```powershell
 python diagnostico.py
-
-##Observações
+```
+**Observações**
 
 Os dados utilizados são públicos (Receita Federal)
 Uso indicado para prospecção e análise B2B
