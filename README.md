@@ -96,12 +96,3 @@ Respeite a LGPD ao entrar em contato com empresas
 
 markdown
 Copiar código
-
----
-
-### Extras (opcional, mas deixa **nível profissional** 👇)
-
-Se quiser, recomendo adicionar:
-- `.gitignore` (Python padrão)
-- `LICENSE`
-- badges no topo (Python / Streamlit / DuckDB)
