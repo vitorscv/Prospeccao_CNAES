@@ -1,8 +1,8 @@
 # Prospecção de Leads por CNAE
 
 
-Ferramenta em *Python* para prospecção de empresas brasileiras usando *CNAE, UF e cidade*, a partir de dados públicos da Receita Federal (CNPJ).  
-Os dados são armazenados localmente em *DuckDB* e os resultados podem ser exportados em *CSV*.
+Ferramenta em Python para prospecção de empresas brasileiras usando CNAE, UF e cidade, a partir de dados públicos da Receita Federal (CNPJ).  
+Os dados são armazenados localmente em DuckDB e os resultados podem ser exportados em CSV.
 ---
 
 ## Funcionalidades
