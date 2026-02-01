@@ -1,112 +1,100 @@
-# Prospecção de Leads por CNAE
+# Hunter Leads - Enterprise
 
-
-Ferramenta em **Python** para prospecção de empresas brasileiras usando **CNAE, UF e cidade**, a partir de dados públicos da Receita Federal (CNPJ).  
-Os dados são armazenados localmente em **DuckDB** e os resultados podem ser exportados em **CSV**.
-
+Ferramenta profissional em **Python** para inteligência de mercado e prospecção B2B usando **CNAE, UF e Cidade**. 
+Utiliza **DuckDB** para alta performance em grandes volumes de dados e **Streamlit** para a interface visual.
+Os resultados são exportados em **Excel (.xlsx)** formatado e pronto para uso.
 
 ## Funcionalidades
 
-- Filtro por CNAE principal  
-- Filtro por UF e município  
-- Banco local DuckDB  
-- Processamento de arquivos grandes  
-- Exportação de leads em CSV  
-- Interface web com Streamlit  
-- Scripts de diagnóstico e atualização  
-- Automação via n8n  
+- **Arquitetura Modular:** Código organizado em Camadas (Database, Service, DTO).
+- **Busca Inteligente:** Filtro de cidades dinâmico (carrega apenas cidades com empresas do estado).
+- **Descobridor de CNAE:** Pesquisa por palavras-chave (ex: "Gesso", "TI").
+- **Exportação Premium:** Gera planilhas Excel com colunas ajustadas automaticamente.
+- **Dashboard de Mercado:** Gráficos de ranking das cidades com mais oportunidades.
+- **Segurança de Memória:** Limite automático de registros para proteger o computador.
+- **Banco Local:** DuckDB (Zero configuração de servidor).
 
 ---
 ## Estrutura de pastas
 
-```
-Prospeccao_CNAES/
-├── app_leads.py
-├── extrator.py
-├── utils_cnae.py
-├── setup_banco.py
-├── setup_banco_completo.py
-├── update_cidades.py
-├── diagnostico.py
-├── auto_atualizacao_n8n.py
-├── requirements.txt
-├── base_leads.db
+```text
+HunterLeads/
+├── app.py                   <-- Novo arquivo principal
+├── hunter_leads.db          <-- Seu banco de dados DuckDB
+├── requirements.txt         <-- Dependências (incluindo xlsxwriter)
+├── setup_banco_completo.py  <-- Script de criação do banco
+├── extrator.py              <-- Script de processamento bruto
+├── auto_atualizacao_n8n.py  <-- Automação externa
+├── src/                     <-- NOVA ARQUITETURA
+│   ├── database/            # Conexão e Queries SQL
+│   ├── models/              # DTOs (Definição de dados)
+│   └── services/            # Lógica de Excel
 └── dados/
-    └── ESTABELE*.zip
+    └── .csv ou .zip da Receita
 ```
-
-
----
 
 ## Requisitos
 
-- Python **3.10+**
-- Pip
+- **Python 3.10+**
+- **Pip**
+- **Bibliotecas:** streamlit, duckdb, pandas, xlsxwriter
 
 ## Instalação
 
-1. Instale as dependências:
+Instale as dependências:
+
 ```powershell
-py -m pip install --user streamlit duckdb pandas
+pip install -r requirements.txt
 ```
 
-Ou usando o requirements.txt:
-```powershell
-py -m pip install --user -r requirements.txt
-```
+> **Nota:** Certifique-se de que o xlsxwriter está no arquivo requirements.txt
 
-## Configuração
+## Configuração Inicial (Apenas na primeira vez)
 
-1. **Baixe o arquivo de dados da Receita Federal:**
-   - Acesse: https://dadosabertos.rfb.gov.br/CNPJ/
-   - Baixe o arquivo `ESTABELECIMENTOS*.zip` 
-   - Coloque o arquivo na pasta `dados/`
+### Baixe os dados da Receita Federal:
 
-## Execução
+1. Acesse: https://dadosabertos.rfb.gov.br/CNPJ/
+2. Baixe o arquivo `ESTABELECIMENTOS*.zip`
+3. Coloque na pasta `dados/`
 
-Execute o aplicativo:
-```powershell
-streamlit run extrator.py
-```
-
-O aplicativo abrirá no navegador em `http://localhost:8501`
-
----
-
-## Setup do Banco de Dados
-
-Setup completo (recomendado):
+### Crie o Banco de Dados:
 
 ```powershell
 python setup_banco_completo.py
 ```
 
-## Executar a Aplicação
+## Execução
+
+Execute a aplicação (agora pelo app.py):
 
 ```powershell
-streamlit run app_leads.py
+streamlit run app.py
 ```
 
-Acesse no navegador:
-
-http://localhost:8501
+O sistema abrirá automaticamente em http://localhost:8501
 
 ## Como Usar
 
-- Informe os CNAEs (separados por vírgula)
-- Selecione a UF
-- (Opcional) Selecione a cidade
-- Gere os leads
-- Exporte o CSV
+1. **Descobrir CNAE:** Use a aba 1 para pesquisar o código da atividade (ex: "Farmácia").
+2. **Filtrar:**
+   - Selecione o Estado (UF).
+   - Selecione a Cidade (a lista carrega apenas cidades daquele estado).
+   - Cole os códigos CNAE na barra lateral.
+3. **Gerar Leads:** Clique em 🚀 GERAR LISTA para ver a tabela e baixar o Excel formatado.
+4. **Analisar Mercado:** Use a aba "Dashboard" para ver gráficos das cidades com mais empresas.
 
-## Diagnóstico (Opcional)
+## Diagnóstico e Manutenção
+
+Para testar a conexão com o banco ou limpar tabelas (se necessário):
 
 ```powershell
-python diagnostico.py
+python setup_banco_completo.py
 ```
+
+> **Nota:** O script setup verifica se o banco existe antes de criar.
 
 ## Observações
 
-- Os dados utilizados são públicos (Receita Federal)
-- Uso indicado para prospecção e análise B2B
-- Respeite a LGPD ao entrar em contato com empresas
+- **Dados Públicos:** Fonte original "Dados Abertos da Receita Federal".
+- **LGPD:** Utilize os dados respeitando as leis de proteção de dados e privacidade.
+- **Performance:** O limite de 50.000 linhas existe para evitar travamento do navegador (limitação do frontend, não do banco).
