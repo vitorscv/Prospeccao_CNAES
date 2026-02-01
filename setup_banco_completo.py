@@ -30,7 +30,7 @@ colunas_empresas = [
 
 # PARTE 1: CNAES 
 
-print("\n📚 1. Importando CNAEs...")
+print("\n 1. Importando CNAEs...")
 try:
     con.execute("DROP TABLE IF EXISTS cnaes")
     # Lê usando Pandas para garantir encoding correto

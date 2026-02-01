@@ -3,7 +3,7 @@ import duckdb
 import pandas as pd
 from io import BytesIO
 
-
+# FUNÇÃO DE EXCEL
 def gerar_excel_formatado(df):
     output = BytesIO() 
 
@@ -17,7 +17,6 @@ def gerar_excel_formatado(df):
 
         # Ajustes de largura 
         for i, col in enumerate(df.columns):
-            
             tam_max = max(
                 df[col].astype(str).map(len).max(),
                 len(str(col))
@@ -86,12 +85,21 @@ with st.sidebar:
     st.header("Filtros de Busca")
     
     estado = st.selectbox("Selecione o Estado Alvo:", 
-                          ["BA", "SP", "RJ", "MG", "RS", "SC", "PR", "PE", "CE", "GO", "ES", "SE", "AL", "PB", "RN", "MA", "PI", "PA", "AM", "MT", "MS", "DF"])
-    
-    # Lógica da Cidade
-    lista_cidades = get_cidades(estado)
-    lista_cidades.insert(0, "TODAS")
-    cidade = st.selectbox("Selecione a Cidade:", lista_cidades)
+                          ["BRASIL", "BA", "SP", "RJ", "MG", "RS", "SC", "PR", "PE", "CE", "GO", "ES", "SE", "AL", "PB", "RN", "MA", "PI", "PA", "AM", "MT", "MS", "DF"])
+
+    # Lógica do Brasil 
+    if estado == "BRASIL":
+        lista_cidades = []
+        cidade = "TODAS"
+        filtro_estado_sql = "" # Não filtra UF na query
+        local_busca_display = "Todo o Brasil"
+    else:
+        lista_cidades = get_cidades(estado)
+        lista_cidades.insert(0, "TODAS")
+        cidade = st.selectbox("Selecione a Cidade:", lista_cidades)
+        filtro_estado_sql = f"AND uf = '{estado}'" # Filtra UF na query
+        local_busca_display = f"{cidade}-{estado}" if cidade != "TODAS" else f"Estado de {estado}"
+
 
     codigo_cnae = st.text_input("Cole o Código CNAE:", placeholder="Ex: 0111301")
     
@@ -99,6 +107,22 @@ with st.sidebar:
     
     # Variável botão
     clicou_buscar = st.button(" GERAR LISTA DE PROSPECÇÃO")
+
+    #INÍCIO DO AVISO 
+    st.caption(f"ℹ️ Limite de segurança: 50.000 resultados")
+    
+    with st.expander("⚠️ Ler sobre o Limite e Riscos"):
+        st.warning("""
+        **Por segurança, o sistema traz no máximo 50.000 empresas.**
+        
+        Se precisar de mais, você pode alterar o `LIMIT` no código, mas tenha cuidado:
+        
+        * **Acima de 100k:** Pode travar o navegador ao tentar exibir a tabela.
+        * **Acima de 500k:** Pode estourar a memória RAM (16GB) e fechar o programa.
+        
+        *Recomendação:* Mantenha em 50k e use filtros de Cidade ou CNAE para segmentar melhor.
+        """)
+     # FIM DO AVISO 
 
 # 4. ÁREA PRINCIPAL (ABAS)
 aba1, aba2, aba3 = st.tabs(["🔍 Descobrir Código", "📊 Gerar Leads", "📈 Dashboard"])
@@ -113,7 +137,6 @@ with aba1:
     if termo_busca:
         con = get_connection()
         if con:
-            # Query 
             query = f"SELECT codigo, descricao FROM cnaes WHERE descricao ILIKE '%{termo_busca}%' LIMIT 15"
             results = con.execute(query).df()
             con.close()
@@ -128,25 +151,23 @@ with aba1:
 with aba2:
     st.header("Base de Empresas")
     
+   
+    
     if clicou_buscar:
         # 1. TRATAMENTO INTELIGENTE DOS CNAES
         lista_cnaes = [c.strip() for c in codigo_cnae.split(',') if c.strip()]
         
         if not lista_cnaes:
-            st.warning("⚠️ Digite pelo menos um código CNAE.")
+            st.warning("⚠️Digite pelo menos um código CNAE.")
         else:
             con = get_connection()
             if con:
-                # Define o local para mostrar na mensagem
-                local_busca = f"{cidade}-{estado}" if cidade != "TODAS" else f"Estado de {estado}"
-                
-                with st.spinner(f"Minerando dados em {local_busca}..."):
+                with st.spinner(f"Minerando dados em {local_busca_display}..."):
                     try:
-                        #LÓGICA DE FILTRO
+                        # LÓGICA DE FILTRO CIDADE
                         filtro_cidade_sql = ""
                         
-                      
-                        if cidade != "TODAS":
+                        if cidade != "TODAS" and estado != "BRASIL":
                             try:
                                 cidade_safe = cidade.replace("'", "''")
                                 q_cod = f"SELECT codigo FROM municipios WHERE descricao = '{cidade_safe}' LIMIT 1"
@@ -159,7 +180,7 @@ with aba2:
                         # FORMATAR PARA SQL
                         cnaes_para_sql = "', '".join(lista_cnaes)
 
-                        # Query Atualizada
+                        # Query 
                         query_leads = f"""
                             SELECT 
                                 nome_fantasia AS "Nome Fantasia",
@@ -173,10 +194,10 @@ with aba2:
                             FROM estabelecimentos 
                             LEFT JOIN municipios m ON estabelecimentos.municipio = m.codigo
                             WHERE cnae_principal IN ('{cnaes_para_sql}') 
-                            AND uf = '{estado}'
+                            {filtro_estado_sql}
                             AND situacao_cadastral = '02'
                             {filtro_cidade_sql}
-                            LIMIT 1000
+                            LIMIT 50000
                         """
                         
                         df_leads = con.execute(query_leads).df()
@@ -196,7 +217,6 @@ with aba2:
                             st.dataframe(df_leads, hide_index=True, use_container_width=True)
                             
                             # TRATAMENTO DO CNPJ E DOWNLOAD
-                            
                             if 'CNPJ' in df_leads.columns:
                                 df_leads['CNPJ'] = df_leads['CNPJ'].astype(str).str.replace(r'\.0$', '', regex=True)
 
@@ -211,7 +231,7 @@ with aba2:
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                             )
                         else:
-                            st.warning(f"Nenhuma empresa encontrada em {local_busca} para os CNAEs informados.")
+                            st.warning(f"Nenhuma empresa encontrada em {local_busca_display} para os CNAEs informados.")
                                                 
                     except Exception as e:
                         st.error(f"Erro na extração: {e}")
@@ -221,7 +241,6 @@ with aba3:
     st.header("📈 Inteligência de Mercado")
     st.info("Analise onde estão as maiores oportunidades.")
 
-   
     if st.button("📊 ANALISAR MERCADO"):
         if not codigo_cnae:
             st.warning("⚠️ Digite um CNAE na barra lateral primeiro.")
@@ -230,7 +249,7 @@ with aba3:
             if con:
                 with st.spinner(f"Analisando o mercado em {estado}..."):
                     try:
-                        # 1. Trata os CNAES (
+                        # 1. Trata os CNAES
                         lista_cnaes = [c.strip() for c in codigo_cnae.split(',') if c.strip()]
                         cnaes_sql = "', '".join(lista_cnaes)
                         
@@ -242,7 +261,7 @@ with aba3:
                             FROM estabelecimentos
                             LEFT JOIN municipios m ON estabelecimentos.municipio = m.codigo
                             WHERE cnae_principal IN ('{cnaes_sql}')
-                            AND uf = '{estado}'
+                            {filtro_estado_sql}
                             AND situacao_cadastral = '02'
                             GROUP BY m.descricao
                             ORDER BY "Total de Empresas" DESC
