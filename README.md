@@ -1,4 +1,4 @@
-# Hunter Leads - Enterprise
+# Hunter Leads 
 
 Ferramenta profissional em **Python** para inteligência de mercado e prospecção B2B usando **CNAE, UF e Cidade**. 
 Utiliza **DuckDB** para alta performance em grandes volumes de dados e **Streamlit** para a interface visual.
@@ -80,7 +80,7 @@ O sistema abrirá automaticamente em http://localhost:8501
    - Selecione o Estado (UF).
    - Selecione a Cidade (a lista carrega apenas cidades daquele estado).
    - Cole os códigos CNAE na barra lateral.
-3. **Gerar Leads:** Clique em 🚀 GERAR LISTA para ver a tabela e baixar o Excel formatado.
+3. **Gerar Leads:** Clique em  GERAR LISTA para ver a tabela e baixar o Excel formatado.
 4. **Analisar Mercado:** Use a aba "Dashboard" para ver gráficos das cidades com mais empresas.
 
 ## Diagnóstico e Manutenção
