@@ -8,26 +8,25 @@ Os resultados são exportados em **Excel (.xlsx)** formatado e pronto para uso.
 
 - **Arquitetura Modular:** Código organizado em Camadas (Database, Service, DTO).
 - **Busca Inteligente:** Filtro de cidades dinâmico (carrega apenas cidades com empresas do estado).
-- **Descobridor de CNAE:** Pesquisa por palavras-chave (ex: "Gesso", "TI").
+- **Descobridor de CNAE:** Pesquisa por palavras-chave (ex: "Arroz","Gesso", "Padaria").
 - **Exportação Premium:** Gera planilhas Excel com colunas ajustadas automaticamente.
 - **Dashboard de Mercado:** Gráficos de ranking das cidades com mais oportunidades.
 - **Segurança de Memória:** Limite automático de registros para proteger o computador.
-- **Banco Local:** DuckDB (Zero configuração de servidor).
-
+- **Banco Local:** DuckDB 
 ---
 ## Estrutura de pastas
 
 ```text
 HunterLeads/
-├── app.py                   <-- Novo arquivo principal
-├── hunter_leads.db          <-- Seu banco de dados DuckDB
-├── requirements.txt         <-- Dependências (incluindo xlsxwriter)
+├── app.py                   <-- Arquivo principal
+├── hunter_leads.db          <-- banco de dados DuckDB
+├── requirements.txt         <-- Dependências 
 ├── setup_banco_completo.py  <-- Script de criação do banco
 ├── extrator.py              <-- Script de processamento bruto
 ├── auto_atualizacao_n8n.py  <-- Automação externa
-├── src/                     <-- NOVA ARQUITETURA
+├── src/                     <-- ARQUITETURA
 │   ├── database/            # Conexão e Queries SQL
-│   ├── models/              # DTOs (Definição de dados)
+│   ├── models/              # DTOs 
 │   └── services/            # Lógica de Excel
 └── dados/
     └── .csv ou .zip da Receita
@@ -47,8 +46,7 @@ Instale as dependências:
 pip install -r requirements.txt
 ```
 
-> **Nota:** Certifique-se de que o xlsxwriter está no arquivo requirements.txt
-
+> **Nota:** 
 ## Configuração Inicial (Apenas na primeira vez)
 
 ### Baixe os dados da Receita Federal:
@@ -97,4 +95,4 @@ python setup_banco_completo.py
 
 - **Dados Públicos:** Fonte original "Dados Abertos da Receita Federal".
 - **LGPD:** Utilize os dados respeitando as leis de proteção de dados e privacidade.
-- **Performance:** O limite de 50.000 linhas existe para evitar travamento do navegador (limitação do frontend, não do banco).
+- **Performance:** O limite de 50.000 leads existe para evitar travamento do navegador mas pode ser alterado, o banco tem tudo.
