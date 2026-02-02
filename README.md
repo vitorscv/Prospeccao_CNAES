@@ -1,49 +1,98 @@
-# Gerador de Leads Estratégicos
+# Hunter Leads 
 
-Aplicação Streamlit para gerar listas de prospecção baseadas em CNAE, Estado e Cidade.
+Ferramenta profissional em **Python** para inteligência de mercado e prospecção B2B usando **CNAE, UF e Cidade**. 
+Utiliza **DuckDB** para alta performance em grandes volumes de dados e **Streamlit** para a interface visual.
+Os resultados são exportados em **Excel (.xlsx)** formatado e pronto para uso.
+
+## Funcionalidades
+
+- **Arquitetura Modular:** Código organizado em Camadas (Database, Service, DTO).
+- **Busca Inteligente:** Filtro de cidades dinâmico (carrega apenas cidades com empresas do estado).
+- **Descobridor de CNAE:** Pesquisa por palavras-chave (ex: "Arroz","Gesso", "Padaria").
+- **Exportação Premium:** Gera planilhas Excel com colunas ajustadas automaticamente.
+- **Dashboard de Mercado:** Gráficos de ranking das cidades com mais oportunidades.
+- **Segurança de Memória:** Limite automático de registros para proteger o computador.
+- **Banco Local:** DuckDB 
+---
+## Estrutura de pastas
+
+```text
+HunterLeads/
+├── app.py                   <-- Arquivo principal
+├── hunter_leads.db          <-- banco de dados DuckDB
+├── requirements.txt         <-- Dependências 
+├── setup_banco_completo.py  <-- Script de criação do banco
+├── extrator.py              <-- Script de processamento bruto
+├── auto_atualizacao_n8n.py  <-- Automação externa
+├── src/                     <-- ARQUITETURA
+│   ├── database/            # Conexão e Queries SQL
+│   ├── models/              # DTOs 
+│   └── services/            # Lógica de Excel
+└── dados/
+    └── .csv ou .zip da Receita
+```
+
+## Requisitos
+
+- **Python 3.10+**
+- **Pip**
+- **Bibliotecas:** streamlit, duckdb, pandas, xlsxwriter
 
 ## Instalação
 
-1. Instale as dependências:
+Instale as dependências:
+
 ```powershell
-py -m pip install --user streamlit duckdb pandas
+pip install -r requirements.txt
 ```
 
-Ou usando o requirements.txt:
+> **Nota:** 
+## Configuração Inicial (Apenas na primeira vez)
+
+### Baixe os dados da Receita Federal:
+
+1. Acesse: https://dadosabertos.rfb.gov.br/CNPJ/
+2. Baixe o arquivo `ESTABELECIMENTOS*.zip`
+3. Coloque na pasta `dados/`
+
+### Crie o Banco de Dados:
+
 ```powershell
-py -m pip install --user -r requirements.txt
-```
-
-## Configuração
-
-1. **Baixe o arquivo de dados da Receita Federal:**
-   - Acesse: https://dadosabertos.rfb.gov.br/CNPJ/
-   - Baixe o arquivo `ESTABELE0.zip` (ou outro arquivo ESTABELE)
-   - Coloque o arquivo na pasta `dados/`
-
-2. **Estrutura de pastas:**
-```
-Prospeccao_CNAES/
-├── extrator.py
-├── requirements.txt
-├── dados/
-│   └── ESTABELE0.zip  ← Coloque o arquivo aqui
-└── base_leads.db      ← Será criado automaticamente
+python setup_banco_completo.py
 ```
 
 ## Execução
 
-Execute o aplicativo:
+Execute a aplicação (agora pelo app.py):
+
 ```powershell
-streamlit run extrator.py
+streamlit run app.py
 ```
 
-O aplicativo abrirá no navegador em `http://localhost:8501`
+O sistema abrirá automaticamente em http://localhost:8501
 
-## Uso
+## Como Usar
 
-1. Informe os CNAEs desejados (separados por vírgula)
-2. Selecione o Estado (UF)
-3. (Opcional) Informe o código do município
-4. Clique em "Gerar Lista de Prospecção"
-5. Baixe o resultado em CSV
+1. **Descobrir CNAE:** Use a aba 1 para pesquisar o código da atividade (ex: "Farmácia").
+2. **Filtrar:**
+   - Selecione o Estado (UF).
+   - Selecione a Cidade (a lista carrega apenas cidades daquele estado).
+   - Cole os códigos CNAE na barra lateral.
+3. **Gerar Leads:** Clique em  GERAR LISTA para ver a tabela e baixar o Excel formatado.
+4. **Analisar Mercado:** Use a aba "Dashboard" para ver gráficos das cidades com mais empresas.
+
+## Diagnóstico e Manutenção
+
+Para testar a conexão com o banco ou limpar tabelas (se necessário):
+
+```powershell
+python setup_banco_completo.py
+```
+
+> **Nota:** O script setup verifica se o banco existe antes de criar.
+
+## Observações
+
+- **Dados Públicos:** Fonte original "Dados Abertos da Receita Federal".
+- **LGPD:** Utilize os dados respeitando as leis de proteção de dados e privacidade.
+- **Performance:** O limite de 50.000 leads existe para evitar travamento do navegador mas pode ser alterado, o banco tem tudo.

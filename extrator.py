@@ -7,7 +7,7 @@ st.set_page_config(page_title="hunter_leads - Lead Generator", layout="wide")
 st.title(" Gerador de Leads Estratégicos")
 st.subheader("Filtre por CNAE, Estado e Cidade em tempo real")
 
-# --- BARRA LATERAL DE FILTROS ---
+# BARRA LATERAL DE FILTROS
 with st.sidebar:
     st.header("Configurações da Busca")
     
@@ -21,7 +21,7 @@ with st.sidebar:
     
     botao_buscar = st.button("🔍 Gerar Lista de Prospecção")
 
-# --- LÓGICA DE BUSCA ---
+#  LÓGICA DE BUSCA 
 if botao_buscar:
     con = duckdb.connect('base_leads.db')
     
@@ -62,5 +62,5 @@ if botao_buscar:
     else:
         st.warning("Nenhuma empresa encontrada com esses filtros no arquivo.")
 
-# --- DICA PARA O USUÁRIO ---
+# DICA PARA O USUÁRIO 
 st.info(" Dica: Se precisar de cidades específicas, consulte o código do município no site do IBGE ou na base da Receita.")
