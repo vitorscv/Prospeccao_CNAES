@@ -1,3 +1,4 @@
+from src.ui.icons import Icons
 import streamlit as st
 import pandas as pd
 try:
