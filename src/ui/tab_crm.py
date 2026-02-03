@@ -33,13 +33,33 @@ def render_tab_crm():
         st.info("Sua carteira está vazia. Vá na aba 'Gerar Leads' e importe leads.")
         return
 
-    # 2. Métricas
+    # 2. Métricas (OTIMIZADO: calcula direto do DataFrame em memória)
     total = len(df_pipeline)
     valor_total = df_pipeline['valor'].sum()
     
-    c1, c2 = st.columns(2)
-    c1.metric("Leads na Carteira", total)
-    c2.metric("Potencial Total", f"R$ {valor_total:,.2f}")
+    # Métricas de vendas (baseado na fase "Vendido")
+    vendas = len(df_pipeline[df_pipeline['status'] == 'Vendido'])
+    valor_vendas = df_pipeline[df_pipeline['status'] == 'Vendido']['valor'].sum()
+    
+    # Métricas em negociação
+    em_negociacao = len(df_pipeline[df_pipeline['status'] == 'Em Negociação'])
+    valor_negociacao = df_pipeline[df_pipeline['status'] == 'Em Negociação']['valor'].sum()
+    
+    # Exibe métricas em 4 colunas
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("📊 Total de Leads", total)
+    c2.metric("💰 Potencial Total", f"R$ {valor_total:,.2f}")
+    c3.metric("✅ Vendas Realizadas", vendas, help="Leads com status 'Vendido'")
+    c4.metric("💵 Valor em Vendas", f"R$ {valor_vendas:,.2f}", help="Soma dos valores vendidos")
+    
+    # Segunda linha de métricas
+    st.divider()
+    c5, c6, c7, c8 = st.columns(4)
+    c5.metric("🤝 Em Negociação", em_negociacao)
+    c6.metric("💼 Valor Negociação", f"R$ {valor_negociacao:,.2f}")
+    taxa_conversao = (vendas / total * 100) if total > 0 else 0
+    c7.metric("📈 Taxa Conversão", f"{taxa_conversao:.1f}%", help="Vendas / Total de Leads")
+    c8.metric("🎯 Novos Leads", len(df_pipeline[df_pipeline['status'] == 'Novo']))
     
     st.divider()
 
