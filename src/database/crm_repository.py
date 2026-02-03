@@ -120,6 +120,7 @@ def _buscar_pipeline_interno():
     """
     Função interna com cache do Streamlit.
     Cache de 5 minutos para evitar queries repetidas.
+    OTIMIZADO: Query mais rápida, apenas colunas necessárias.
     """
     inicializar_crm() 
 
@@ -127,74 +128,117 @@ def _buscar_pipeline_interno():
     if not con: return pd.DataFrame()
     
     try:
-        # Verifica se a tabela municipios existe
-        tabela_municipios_existe = False
+        # OTIMIZAÇÃO: Primeiro busca só do CRM (muito mais rápido)
+        # Depois faz JOIN apenas se necessário
+        query_crm = """
+            SELECT 
+                cnpj,
+                status,
+                valor,
+                anotacao,
+                data_atualizacao
+            FROM crm
+            ORDER BY data_atualizacao DESC
+            LIMIT 10000
+        """
+        
+        df_crm = con.execute(query_crm).df()
+        
+        if df_crm.empty:
+            con.close()
+            return pd.DataFrame()
+        
+        # OTIMIZAÇÃO: Busca estabelecimentos apenas para os CNPJs do CRM
+        # Usa JOIN direto que é otimizado pelo DuckDB
+        if len(df_crm) > 0:
+            # Query otimizada: JOIN direto (DuckDB otimiza isso automaticamente)
+            query_estab = """
+                SELECT 
+                    (e.cnpj_basico || e.cnpj_ordem || e.cnpj_dv) AS cnpj,
+                    e.nome_fantasia,
+                    e.ddd_1,
+                    e.telefone_1,
+                    e.correio_eletronico AS email,
+                    e.uf,
+                    e.municipio
+                FROM estabelecimentos e
+                INNER JOIN (
+                    SELECT cnpj FROM crm ORDER BY data_atualizacao DESC LIMIT 10000
+                ) c ON (e.cnpj_basico || e.cnpj_ordem || e.cnpj_dv) = c.cnpj
+            """
+            
+            try:
+                df_estab = con.execute(query_estab).df()
+            except Exception as e:
+                # Se falhar, retorna DataFrame vazio (dados básicos do CRM ainda funcionam)
+                print(f"Erro ao buscar estabelecimentos: {e}")
+                df_estab = pd.DataFrame()
+        else:
+            df_estab = pd.DataFrame()
+        
+        # Verifica se municipios existe e busca se necessário
+        df_municipios = pd.DataFrame()
         try:
-            con.execute("SELECT 1 FROM municipios LIMIT 1")
-            tabela_municipios_existe = True
+            if not df_estab.empty and 'municipio' in df_estab.columns:
+                municipios_codigos = df_estab['municipio'].dropna().unique().tolist()
+                if municipios_codigos:
+                    query_mun = f"""
+                        SELECT codigo, descricao
+                        FROM municipios
+                        WHERE codigo IN ({','.join([f"'{m}'" for m in municipios_codigos[:500]])})
+                    """
+                    try:
+                        df_municipios = con.execute(query_mun).df()
+                    except:
+                        pass
         except:
             pass
         
-        # Query otimizada: primeiro busca do CRM, depois faz JOINs menores
-        if tabela_municipios_existe:
-            query = """
-                SELECT 
-                    c.cnpj,
-                    COALESCE(e.nome_fantasia, 'N/A') AS nome_fantasia,
-                    c.status,
-                    COALESCE(c.valor, 0.0) AS valor,
-                    COALESCE(c.anotacao, '') AS anotacao,
-                    CASE 
-                        WHEN e.ddd_1 IS NOT NULL AND e.telefone_1 IS NOT NULL 
-                        THEN e.ddd_1 || ' ' || e.telefone_1 
-                        ELSE '' 
-                    END AS telefone,
-                    COALESCE(e.correio_eletronico, '') AS email,
-                    CASE 
-                        WHEN m.descricao IS NOT NULL AND e.uf IS NOT NULL
-                        THEN m.descricao || '-' || e.uf 
-                        WHEN e.uf IS NOT NULL
-                        THEN e.uf
-                        ELSE 'N/A'
-                    END AS local
-                FROM crm c
-                LEFT JOIN estabelecimentos e ON c.cnpj = (e.cnpj_basico || e.cnpj_ordem || e.cnpj_dv)
-                LEFT JOIN municipios m ON e.municipio = m.codigo
-                ORDER BY c.data_atualizacao DESC
-                LIMIT 10000
-            """
-        else:
-            # Query sem JOIN com municipios (mais rápida)
-            query = """
-                SELECT 
-                    c.cnpj,
-                    COALESCE(e.nome_fantasia, 'N/A') AS nome_fantasia,
-                    c.status,
-                    COALESCE(c.valor, 0.0) AS valor,
-                    COALESCE(c.anotacao, '') AS anotacao,
-                    CASE 
-                        WHEN e.ddd_1 IS NOT NULL AND e.telefone_1 IS NOT NULL 
-                        THEN e.ddd_1 || ' ' || e.telefone_1 
-                        ELSE '' 
-                    END AS telefone,
-                    COALESCE(e.correio_eletronico, '') AS email,
-                    COALESCE(e.uf, 'N/A') AS local
-                FROM crm c
-                LEFT JOIN estabelecimentos e ON c.cnpj = (e.cnpj_basico || e.cnpj_ordem || e.cnpj_dv)
-                ORDER BY c.data_atualizacao DESC
-                LIMIT 10000
-            """
-        
-        df = con.execute(query).df()
         con.close()
         
-        # Garante que as colunas existem mesmo se o JOIN falhar
+        # Merge otimizado (mais rápido que JOIN no banco para datasets pequenos)
+        df = df_crm.copy()
+        
+        if not df_estab.empty:
+            df = df.merge(df_estab, on='cnpj', how='left')
+            
+            # Adiciona telefone formatado
+            df['telefone'] = df.apply(
+                lambda row: f"{row['ddd_1']} {row['telefone_1']}" 
+                if pd.notna(row.get('ddd_1')) and pd.notna(row.get('telefone_1')) 
+                else '', axis=1
+            )
+            
+            # Merge com municipios se disponível
+            if not df_municipios.empty and 'municipio' in df.columns:
+                df = df.merge(df_municipios, left_on='municipio', right_on='codigo', how='left')
+                df['local'] = df.apply(
+                    lambda row: f"{row['descricao']}-{row['uf']}" 
+                    if pd.notna(row.get('descricao')) and pd.notna(row.get('uf'))
+                    else (row['uf'] if pd.notna(row.get('uf')) else 'N/A'), axis=1
+                )
+            else:
+                df['local'] = df['uf'].fillna('N/A')
+        else:
+            # Se não encontrou estabelecimentos, preenche com valores padrão
+            df['nome_fantasia'] = 'N/A'
+            df['telefone'] = ''
+            df['email'] = ''
+            df['local'] = 'N/A'
+        
+        # Garante que as colunas existem
         colunas_esperadas = ['cnpj', 'nome_fantasia', 'status', 'valor', 'anotacao', 'telefone', 'email', 'local']
         for col in colunas_esperadas:
             if col not in df.columns:
                 df[col] = ''
         
-        return df
+        # Converte tipos para garantir consistência
+        df['valor'] = pd.to_numeric(df['valor'], errors='coerce').fillna(0.0)
+        df['status'] = df['status'].fillna('Novo')
+        df['anotacao'] = df['anotacao'].fillna('')
+        
+        return df[colunas_esperadas]  # Retorna apenas colunas necessárias
+        
     except Exception as e:
         # Se der erro, retorna DataFrame vazio para não quebrar a tela
         if con:
