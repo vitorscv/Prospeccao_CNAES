@@ -56,7 +56,7 @@ with st.sidebar:
     st.caption("Separe por vírgula. Ex: 4711302, 4729699")
     
     st.divider()
-    clicou_buscar = st.button(" GERAR LISTA DE PROSPECÇÃO")
+    clicou_buscar = st.button(" GERAR LISTA DE PROSPECÇÃO", type="primary", icon=Icons.BUSCAR)
 
     st.caption(f"ℹ️ Limite de segurança: 50.000 resultados")
     
@@ -129,7 +129,7 @@ with aba2:
     resultados = st.session_state.resultados_busca
     
     if resultados:
-        # --- PARTE A: MÉTRICAS (Igual antes) ---
+        # MÉTRICAS 
         total = len(resultados)
         com_email = sum(1 for r in resultados if r.email)
         com_tel = sum(1 for r in resultados if r.telefone_principal)
@@ -141,7 +141,7 @@ with aba2:
         
         st.divider()
 
-        # --- PARTE B: BOTÃO BAIXAR TUDO ---
+        # BOTÃO BAIXAR TUDO 
         col_txt, col_btn = st.columns([3, 1])
         with col_txt:
             st.info("👇 Selecione as empresas na tabela para enviar ao CRM ou baixar separado.")
@@ -161,7 +161,7 @@ with aba2:
             st.session_state.filtros_busca = None
             st.rerun()
 
-        # --- PARTE C: TABELA COM CHECKBOX ---
+        # TABELA COM CHECKBOX ---
         df_view = pd.DataFrame([vars(r) for r in resultados])
         
         # Filtra colunas visíveis
@@ -172,12 +172,12 @@ with aba2:
             df_view[cols_finais],
             use_container_width=True,
             hide_index=True,
-            selection_mode="multi-row", # <--- O PULO DO GATO
+            selection_mode="multi-row", 
             on_select="rerun",
             key="grid_principal"
         )
         
-        # --- PARTE D: AÇÕES DOS SELECIONADOS ---
+        # AÇÕES DOS SELECIONADOS
         indices = evento.selection.rows
         
         if indices:
@@ -189,7 +189,7 @@ with aba2:
             
             col_a, col_b = st.columns(2)
             
-            # Botão 1: CRM
+            # Botão ENVIAR PARA CRM LEADS
             with col_a:
                 if st.button(" ENVIAR PARA CRM LEADS ", type="primary", use_container_width=True):
                     if adicionar_lista_ao_crm(lista_selecionados_dict):
@@ -197,7 +197,7 @@ with aba2:
                     else:
                         st.error("Erro ao salvar.")
             
-            # Botão 2: Baixar Selecionados
+            # Baixar Selecionados
             with col_b:
                 excel_parcial = gerar_excel_de_dtos(lista_selecionados_dto)
                 st.download_button(
@@ -212,9 +212,9 @@ with aba2:
 with aba3:
     render_tab_crm()
 
-# --- ABA 4: DASHBOARD EXECUTIVO ---
+# ABA 4: DASHBOARD
 with aba4:
-    st.header("📊 Dashboard Executivo - Inteligência de Mercado")
+    st.header("📊 Dashboard - Inteligência de Mercado")
     st.caption("Análise estratégica de oportunidades e expansão territorial")
     st.info("💡 Use os filtros da barra lateral para personalizar a análise.")
     
@@ -223,7 +223,7 @@ with aba4:
     lista_estados_filtro = None if estado == "BRASIL" else [estado]
     lista_cidades_filtro = None if cidade == "TODAS" else [cidade]
     
-    # Busca dados usando os filtros da sidebar principal
+   
     with st.spinner("🔍 Carregando dados do dashboard..."):
         dados_dash = buscar_dados_dashboard_executivo(
             lista_estados=lista_estados_filtro,
@@ -236,7 +236,7 @@ with aba4:
     else:
         kpis = dados_dash['kpis'].iloc[0]
         
-        # ========== LINHA 1: BIG NUMBERS / KPIs ==========
+        # BIG NUMBERS / KPIs
         st.markdown("---")
         st.markdown("### 📈 Indicadores Principais")
         
@@ -277,7 +277,7 @@ with aba4:
             
             df_mapa = dados_dash['mapa'].copy()
             
-            # Coordenadas aproximadas por UF (centro do estado)
+            # Coordenadas aproximadas por UF 
             coordenadas_uf = {
                 'AC': (-9.0238, -70.8120), 'AL': (-9.5713, -36.7820), 'AP': (1.4144, -51.7865),
                 'AM': (-4.2633, -65.2432), 'BA': (-12.9714, -38.5014), 'CE': (-3.7172, -38.5433),
@@ -290,7 +290,7 @@ with aba4:
                 'SP': (-23.5505, -46.6333), 'SE': (-10.5741, -37.3857), 'TO': (-10.1753, -48.2982)
             }
             
-            # Adiciona coordenadas aproximadas (centro da cidade baseado no estado)
+            # Adiciona coordenadas aproximadas 
             df_mapa['lat'] = df_mapa['uf'].map(lambda x: coordenadas_uf.get(x, (-14.2350, -51.9253))[0])
             df_mapa['lon'] = df_mapa['uf'].map(lambda x: coordenadas_uf.get(x, (-14.2350, -51.9253))[1])
             
@@ -332,7 +332,7 @@ with aba4:
         
         col_graf1, col_graf2 = st.columns(2)
         
-        # Gráfico 1: Top 10 Cidades (Barras Horizontais)
+        # Gráfico Top 10 Cidades 
         with col_graf1:
             if dados_dash.get('top10_cidades') is not None and not dados_dash['top10_cidades'].empty:
                 st.markdown("#### 🏆 Top 10 Cidades com Maior Potencial")
@@ -361,7 +361,7 @@ with aba4:
             else:
                 st.info("Sem dados suficientes para Top 10")
         
-        # Gráfico 2: Distribuição por CNAE/Setor (Treemap ou Donut)
+        # Gráfico Distribuição por CNAE/Setor 
         with col_graf2:
             if dados_dash.get('distribuicao_cnae') is not None and not dados_dash['distribuicao_cnae'].empty:
                 st.markdown("#### 🏭 Distribuição por Setor (CNAE)")
@@ -390,7 +390,7 @@ with aba4:
         
         st.markdown("---")
         
-        # ========== LINHA 4: DISTRIBUIÇÃO POR ESTADO ==========
+        # DISTRIBUIÇÃO POR ESTADO
         if dados_dash.get('distribuicao_uf') is not None and not dados_dash['distribuicao_uf'].empty:
             st.markdown("### 📍 Distribuição por Estado")
             df_uf = dados_dash['distribuicao_uf'].copy()
@@ -423,12 +423,12 @@ with aba4:
                     percentual_lider = (df_uf.iloc[0]['total'] / df_uf['total'].sum() * 100)
                     st.metric("Participação do Líder", f"{percentual_lider:.1f}%")
 
-# --- ABA 5: ANALYTICS PIPELINE ---
+# ABA 5: ANALYTICS PIPELINE
 with aba5:
     st.header("📊 Analytics do Pipeline")
     st.caption("Análise avançada e insights sobre seu pipeline de vendas")
     
-    # Carrega dados automaticamente ao abrir a aba
+    # Carrega dados automaticamente
     if 'analises_pipe_cache' not in st.session_state:
         with st.spinner("🔍 Carregando análise do pipeline..."):
             st.session_state.analises_pipe_cache = analise_pipeline()
@@ -442,7 +442,7 @@ with aba5:
             st.rerun()
     
     if analises_pipe and analises_pipe.get('estatisticas') is not None and not analises_pipe['estatisticas'].empty:
-        # ===== SEÇÃO 1: MÉTRICAS PRINCIPAIS =====
+        # MÉTRICAS PRINCIPAIS
         st.markdown("### 📊 Visão Geral do Pipeline")
         
         stats = analises_pipe['estatisticas'].iloc[0]
@@ -468,7 +468,7 @@ with aba5:
         
         st.divider()
         
-        # ===== SEÇÃO 2: DISTRIBUIÇÃO POR STATUS =====
+        # DISTRIBUIÇÃO POR STATUS
         if analises_pipe.get('distribuicao_status') is not None and not analises_pipe['distribuicao_status'].empty:
             st.markdown("### 📊 Distribuição por Fase do Pipeline")
             df_status = analises_pipe['distribuicao_status']
@@ -483,7 +483,7 @@ with aba5:
             
             st.divider()
         
-        # ===== SEÇÃO 3: EVOLUÇÃO TEMPORAL =====
+        # EVOLUÇÃO TEMPORAL 
         if analises_pipe.get('evolucao_temporal') is not None and not analises_pipe['evolucao_temporal'].empty:
             st.markdown("### 📈 Evolução Temporal (Últimos 12 Meses)")
             df_temporal = analises_pipe['evolucao_temporal']
@@ -499,7 +499,7 @@ with aba5:
             
             st.divider()
         
-        # ===== SEÇÃO 4: TOP 10 POR VALOR =====
+        # TOP 10 POR VALOR
         if analises_pipe.get('top_valor') is not None and not analises_pipe['top_valor'].empty:
             st.markdown("### 💎 Top 10 Leads por Valor")
             df_top_valor = analises_pipe['top_valor']
@@ -507,7 +507,7 @@ with aba5:
             
             st.divider()
         
-        # ===== SEÇÃO 5: TAXA DE CONVERSÃO POR FASE =====
+        # TAXA DE CONVERSÃO POR FASE
         if analises_pipe.get('taxa_conversao') is not None and not analises_pipe['taxa_conversao'].empty:
             st.markdown("### 🎯 Distribuição Percentual por Fase")
             df_conv = analises_pipe['taxa_conversao']
