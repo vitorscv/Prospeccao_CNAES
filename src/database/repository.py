@@ -246,16 +246,23 @@ def analise_pipeline():
             return {}
         
         # 1. Distribuição por Status
+        # Normaliza status: remove espaços, torna maiúsculo e substitui NULL por 'Sem Status'
         query_status = """
             SELECT 
-                status AS "Status",
+                UPPER(TRIM(COALESCE(status, 'Sem Status'))) AS "Status",
                 COUNT(*) AS "Quantidade",
-                SUM(valor) AS "Valor Total"
+                SUM(COALESCE(valor,0)) AS "Valor Total"
             FROM crm
-            GROUP BY status
+            GROUP BY 1
             ORDER BY "Quantidade" DESC
         """
         df_status = con.execute(query_status).df()
+        # DEBUG: mostra status brutos retornados pelo banco
+        try:
+            print("DEBUG - df_status head:")
+            print(df_status.head())
+        except Exception:
+            pass
         
         # 2. Evolução temporal (vendas por mês)
         query_temporal = """
@@ -264,6 +271,18 @@ def analise_pipeline():
                 COUNT(*) AS "Leads",
                 SUM(CASE WHEN status = 'Vendido' THEN 1 ELSE 0 END) AS "Vendas",
                 SUM(CASE WHEN status = 'Vendido' THEN valor ELSE 0 END) AS "Valor Vendido"
+            FROM crm
+            WHERE data_atualizacao >= date('now', '-12 months')
+            GROUP BY strftime('%Y-%m', data_atualizacao)
+            ORDER BY "Mês" DESC
+        """
+        # Ajusta temporal para considerar variações no texto do status (case/acentos)
+        query_temporal = """
+            SELECT 
+                strftime('%Y-%m', data_atualizacao) AS "Mês",
+                COUNT(*) AS "Leads",
+                SUM(CASE WHEN UPPER(status) LIKE '%VENDID%' THEN 1 ELSE 0 END) AS "Vendas",
+                SUM(CASE WHEN UPPER(status) LIKE '%VENDID%' THEN valor ELSE 0 END) AS "Valor Vendido"
             FROM crm
             WHERE data_atualizacao >= date('now', '-12 months')
             GROUP BY strftime('%Y-%m', data_atualizacao)
@@ -285,18 +304,29 @@ def analise_pipeline():
             LIMIT 10
         """
         df_top_valor = con.execute(query_top_valor).df()
+        try:
+            print("DEBUG - df_top_valor head:")
+            print(df_top_valor.head())
+        except Exception:
+            pass
         
         # 4. Taxa de conversão por fase
+        # Conversão por fase usando status normalizado
         query_conversao = """
             SELECT 
-                status AS "Fase",
+                UPPER(TRIM(COALESCE(status, 'Sem Status'))) AS "Fase",
                 COUNT(*) AS "Total",
                 ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM crm), 2) AS "Percentual"
             FROM crm
-            GROUP BY status
+            GROUP BY 1
             ORDER BY "Total" DESC
         """
         df_conversao = con.execute(query_conversao).df()
+        try:
+            print("DEBUG - df_conversao head:")
+            print(df_conversao.head())
+        except Exception:
+            pass
         
         # 5. Estatísticas gerais do pipeline
         query_stats = """
@@ -310,7 +340,24 @@ def analise_pipeline():
                 AVG(CASE WHEN status = 'Vendido' THEN valor ELSE NULL END) AS ticket_medio
             FROM crm
         """
+        # Estatísticas com normalização por LIKE para evitar problemas de acento/case
+        query_stats = """
+            SELECT 
+                COUNT(*) AS total_leads,
+                SUM(CASE WHEN UPPER(status) LIKE '%VENDID%' THEN 1 ELSE 0 END) AS vendas,
+                SUM(CASE WHEN UPPER(status) LIKE '%NEGOC%' THEN 1 ELSE 0 END) AS em_negociacao,
+                SUM(CASE WHEN UPPER(status) LIKE '%NOVO%' THEN 1 ELSE 0 END) AS novos,
+                SUM(valor) AS valor_total,
+                SUM(CASE WHEN UPPER(status) LIKE '%VENDID%' THEN valor ELSE 0 END) AS valor_vendido,
+                AVG(CASE WHEN UPPER(status) LIKE '%VENDID%' THEN valor ELSE NULL END) AS ticket_medio
+            FROM crm
+        """
         df_stats = con.execute(query_stats).df()
+        try:
+            print("DEBUG - df_stats head:")
+            print(df_stats.head())
+        except Exception:
+            pass
         
         con.close()
         

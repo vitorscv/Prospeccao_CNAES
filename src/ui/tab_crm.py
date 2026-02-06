@@ -13,7 +13,7 @@ def render_tab_crm():
     with col_header:
         st.caption("Gerencie seus leads importados. Edite status e valores direto na tabela.")
     with col_refresh:
-        if st.button("🔄 Atualizar", use_container_width=True):
+        if st.button("🔄 Atualizar", width='stretch'):
             # Limpa o cache e força nova busca
             if 'df_pipeline_cache' in st.session_state:
                 del st.session_state.df_pipeline_cache
@@ -30,6 +30,12 @@ def render_tab_crm():
         df_pipeline = st.session_state.df_pipeline_cache.copy()
     
     if df_pipeline.empty:
+        # DEBUG TEMP: mostra o que chegou do banco antes de avisar vazio
+        try:
+            st.write("DEBUG: amostra do df_pipeline", df_pipeline.head())
+            st.write("DEBUG: contagem de status", df_pipeline['status'].value_counts(dropna=False))
+        except Exception:
+            pass
         st.info("Sua carteira está vazia. Vá na aba 'Gerar Leads' e importe leads.")
         return
 
@@ -37,13 +43,18 @@ def render_tab_crm():
     total = len(df_pipeline)
     valor_total = df_pipeline['valor'].sum()
     
-    # Métricas de vendas (baseado na fase "Vendido")
-    vendas = len(df_pipeline[df_pipeline['status'] == 'Vendido'])
-    valor_vendas = df_pipeline[df_pipeline['status'] == 'Vendido']['valor'].sum()
-    
+    # Métricas de vendas (normaliza comparações para evitar problemas de case/acentos)
+    status_upper = df_pipeline['status'].astype(str).str.upper()
+    vendas_mask = status_upper.str.contains('VENDID', na=False)
+    negociacao_mask = status_upper.str.contains('NEGOC', na=False)
+    novo_mask = status_upper.str.contains('NOVO', na=False)
+
+    vendas = int(vendas_mask.sum())
+    valor_vendas = float(df_pipeline.loc[vendas_mask, 'valor'].sum() if not df_pipeline.loc[vendas_mask, 'valor'].empty else 0.0)
+
     # Métricas em negociação
-    em_negociacao = len(df_pipeline[df_pipeline['status'] == 'Em Negociação'])
-    valor_negociacao = df_pipeline[df_pipeline['status'] == 'Em Negociação']['valor'].sum()
+    em_negociacao = int(negociacao_mask.sum())
+    valor_negociacao = float(df_pipeline.loc[negociacao_mask, 'valor'].sum() if not df_pipeline.loc[negociacao_mask, 'valor'].empty else 0.0)
     
     # Exibe métricas em 4 colunas
     c1, c2, c3, c4 = st.columns(4)
@@ -84,7 +95,7 @@ def render_tab_crm():
     # 4. Renderiza a Tabela
     df_editado = st.data_editor(
         df_pipeline,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         column_config=config_colunas,
         num_rows="fixed",
@@ -92,7 +103,7 @@ def render_tab_crm():
     )
 
     # 5. Botão de Salvar (OTIMIZADO: usa batch update + atualiza cache)
-    if st.button("💾 SALVAR ALTERAÇÕES", type="primary", use_container_width=True):
+    if st.button("💾 SALVAR ALTERAÇÕES", type="primary", width='stretch'):
         alteracoes = 0
         cnpjs_excluir = []
         updates_lote = []
