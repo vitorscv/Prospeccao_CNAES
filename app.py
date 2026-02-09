@@ -7,10 +7,11 @@ try:
 except ImportError:
     PLOTLY_AVAILABLE = False
     st.error(" Plotly não está instalado. Execute: pip install plotly")
-from src.database.repository import buscar_empresas_dto, buscar_cnae_por_texto, listar_cidades_do_banco, buscar_dados_dashboard_executivo, analise_pipeline 
+from src.database.repository import buscar_empresas_dto, buscar_cnae_por_texto, listar_cidades_do_banco, buscar_dados_dashboard_executivo
 from src.database.crm_repository import adicionar_lista_ao_crm
 from src.services.excel_service import gerar_excel_de_dtos
 from src.ui.tab_crm import render_tab_crm
+from src.ui.tab_rota_new import render_tab_rota
 #  CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Hunter Leads", layout="wide", page_icon=Icons.LOGO_PAGINA)
 
@@ -79,9 +80,9 @@ st.title(Icons.LOGO_PAGINA + " Hunter Leads - Pantex")
 aba1, aba2, aba3, aba4, aba5 = st.tabs([
     Icons.ABA_CNAE + " Descobrir Código", 
     Icons.ABA_PROSPECT + " Gerar Leads", 
-    Icons.ABA_CRM + " Meu Pipeline", 
+    Icons.ABA_CRM + " Meu Pipeline",
+    Icons.ABA_PROSPECT + " Rota",
     Icons.ABA_DASH + " Dashboard",
-    Icons.ABA_CRM + " Analytics Pipeline"
 ])
 
 # ABA 1: DESCOBRIR CNAE 
@@ -212,8 +213,12 @@ with aba2:
 with aba3:
     render_tab_crm()
 
-# --- ABA 4: DASHBOARD EXECUTIVO ---
+# ABA 4: ROTA
 with aba4:
+    render_tab_rota()
+
+# --- ABA 5: DASHBOARD EXECUTIVO ---
+with aba5:
     st.header(Icons.ABA_DASH + " Dashboard Executivo - Inteligência de Mercado")
     st.caption("Análise estratégica de oportunidades e expansão territorial")
     st.info(Icons.INFO + " Use os filtros da barra lateral para personalizar a análise.")
@@ -423,95 +428,4 @@ with aba4:
                     percentual_lider = (df_uf.iloc[0]['total'] / df_uf['total'].sum() * 100)
                     st.metric(Icons.INFO + " Participação do Líder", f"{percentual_lider:.1f}%")
 
-# --- ABA 5: ANALYTICS PIPELINE ---
-with aba5:
-    st.header(Icons.ABA_CRM + " Analytics do Pipeline")
-    st.caption("Análise avançada e insights sobre seu pipeline de vendas")
-    
-    # Carrega dados automaticamente ao abrir a aba
-    if 'analises_pipe_cache' not in st.session_state:
-        with st.spinner(Icons.CARREGANDO + " Carregando análise do pipeline..."):
-            st.session_state.analises_pipe_cache = analise_pipeline()
-    
-    analises_pipe = st.session_state.analises_pipe_cache
-    
-    # Botão para atualizar
-    if st.button(Icons.BUSCAR + " Atualizar Análise", type="primary", use_container_width=True):
-        with st.spinner(Icons.CARREGANDO + " Atualizando análise do pipeline..."):
-            st.session_state.analises_pipe_cache = analise_pipeline()
-            st.rerun()
-    
-    if analises_pipe and analises_pipe.get('estatisticas') is not None and not analises_pipe['estatisticas'].empty:
-        # ===== SEÇÃO 1: MÉTRICAS PRINCIPAIS =====
-        st.markdown(Icons.ABA_CRM + " Visão Geral do Pipeline")
-        
-        stats = analises_pipe['estatisticas'].iloc[0]
-        total_leads = int(stats['total_leads'])
-        vendas = int(stats['vendas'])
-        em_negociacao = int(stats['em_negociacao'])
-        novos = int(stats['novos'])
-        valor_total = float(stats['valor_total']) if stats['valor_total'] else 0
-        valor_vendido = float(stats['valor_vendido']) if stats['valor_vendido'] else 0
-        ticket_medio = float(stats['ticket_medio']) if stats['ticket_medio'] else 0
-        
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric(Icons.ABA_CRM + " Total de Leads", f"{total_leads:,}")
-        col2.metric(Icons.SUCESSO + " Vendas", f"{vendas:,}", f"{(vendas/total_leads*100):.1f}%" if total_leads > 0 else "0%")
-        col3.metric(Icons.ABA_DASH + " Valor Total", f"R$ {valor_total:,.2f}")
-        col4.metric(Icons.ABA_DASH + " Valor Vendido", f"R$ {valor_vendido:,.2f}")
-        
-        col5, col6, col7, col8 = st.columns(4)
-        col5.metric(Icons.ABA_CRM + " Em Negociação", f"{em_negociacao:,}")
-        col6.metric(Icons.INFO + " Novos Leads", f"{novos:,}")
-        col7.metric(Icons.ABA_DASH + " Taxa Conversão", f"{(vendas/total_leads*100):.1f}%" if total_leads > 0 else "0%")
-        col8.metric(Icons.SALVAR + " Ticket Médio", f"R$ {ticket_medio:,.2f}" if ticket_medio > 0 else "R$ 0,00")
-        
-        st.divider()
-        
-        # ===== SEÇÃO 2: DISTRIBUIÇÃO POR STATUS =====
-        if analises_pipe.get('distribuicao_status') is not None and not analises_pipe['distribuicao_status'].empty:
-            st.markdown(Icons.ABA_CRM + " Distribuição por Fase do Pipeline")
-            df_status = analises_pipe['distribuicao_status']
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.bar_chart(df_status.set_index("Status")[["Quantidade"]], color="#9C27B0", height=400)
-            with col2:
-                st.bar_chart(df_status.set_index("Status")[["Valor Total"]], color="#FF5722", height=400)
-            
-            st.dataframe(df_status, use_container_width=True, hide_index=True)
-            
-            st.divider()
-        
-        # ===== SEÇÃO 3: EVOLUÇÃO TEMPORAL =====
-        if analises_pipe.get('evolucao_temporal') is not None and not analises_pipe['evolucao_temporal'].empty:
-            st.markdown(Icons.ABA_DASH + " Evolução Temporal (Últimos 12 Meses)")
-            df_temporal = analises_pipe['evolucao_temporal']
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.line_chart(df_temporal.set_index("Mês")[["Leads", "Vendas"]], height=300)
-            with col2:
-                st.area_chart(df_temporal.set_index("Mês")[["Valor Vendido"]], color="#4CAF50", height=300)
-            
-            with st.expander("Ver dados temporais completos"):
-                st.dataframe(df_temporal, use_container_width=True, hide_index=True)
-            
-            st.divider()
-        
-        # ===== SEÇÃO 4: TOP 10 POR VALOR =====
-        if analises_pipe.get('top_valor') is not None and not analises_pipe['top_valor'].empty:
-            st.markdown(Icons.ABA_CRM + " Top 10 Leads por Valor")
-            df_top_valor = analises_pipe['top_valor']
-            st.dataframe(df_top_valor, use_container_width=True, hide_index=True)
-            
-            st.divider()
-        
-        # ===== SEÇÃO 5: TAXA DE CONVERSÃO POR FASE =====
-        if analises_pipe.get('taxa_conversao') is not None and not analises_pipe['taxa_conversao'].empty:
-            st.markdown(Icons.LOGO_PAGINA + " Distribuição Percentual por Fase")
-            df_conv = analises_pipe['taxa_conversao']
-            st.bar_chart(df_conv.set_index("Fase")[["Percentual"]], color="#00BCD4", height=300)
-            st.dataframe(df_conv, use_container_width=True, hide_index=True)
-    else:
-        st.warning(Icons.ALERTA + " Seu pipeline está vazio. Vá na aba 'Gerar Leads' e importe leads para ver análises.")
+# Analytics removed per user request.
