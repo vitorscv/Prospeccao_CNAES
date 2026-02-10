@@ -173,7 +173,7 @@ with aba2:
             df_view[cols_finais],
             width='stretch',
             hide_index=True,
-            selection_mode="multi-row", # <--- O PULO DO GATO
+            selection_mode="multi-row", 
             on_select="rerun",
             key="grid_principal"
         )
