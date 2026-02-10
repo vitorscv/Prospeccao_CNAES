@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import streamlit as st
 import pandas as pd
+from time import perf_counter
 from typing import List, Tuple
 
 from src.config.scoring_config import SEGMENTOS_PANTEX
@@ -102,8 +103,10 @@ def render_tab_rota():
             st.error(Icons.ALERTA + " Selecione segmentos ou informe CNAEs!")
             return
 
+        t_total_start = perf_counter()
         with st.spinner(Icons.CARREGANDO + " Gerando rota e buscando leads..."):
             # Monta cidades alvo
+            t_cidades_start = perf_counter()
             cidades_alvo: List[Tuple[str, str]] = []
 
             if modo_rota.startswith("Gerar"):
@@ -139,21 +142,48 @@ def render_tab_rota():
                             cidades_alvo.append((parts[0], parts[1]))
                         else:
                             cidades_alvo.append((linha, uf_base))
+            
+            t_cidades = perf_counter() - t_cidades_start
+            import os
+            if os.getenv("DEBUG_ROTA", "0") == "1":
+                print(f"[DEBUG_ROTA] Montagem de cidades: {t_cidades:.2f}s | Total: {len(cidades_alvo)} cidades")
 
             # Busca leads por cidade e seleciona
             leads_por_cidade: dict[str, List] = {}
             counts_by_city: dict[str, int] = {}
             total_encontrados = 0
-            for cidade_nome, cidade_uf in cidades_alvo:
+            progress_bar = st.progress(0.0)
+            total_cidades = len(cidades_alvo)
+            
+            t_busca_start = perf_counter()
+            for idx, (cidade_nome, cidade_uf) in enumerate(cidades_alvo):
+                t_cidade_start = perf_counter()
                 leads_local = buscar_leads_enriquecidos(
                     lista_cnaes=cnaes_buscar, uf=cidade_uf, cidade=cidade_nome, somente_matriz=somente_matriz, limite=2000
                 )
                 count_local = len(leads_local) if leads_local else 0
                 counts_by_city[f"{cidade_nome} - {cidade_uf}"] = count_local
+                
+                t_scoring_start = perf_counter()
                 leads_scored = qualificar_leads(leads_local, score_minimo=0) if leads_local else []
+                t_scoring = perf_counter() - t_scoring_start
+                
                 chave = f"{cidade_nome} - {cidade_uf}"
                 leads_por_cidade[chave] = leads_scored
                 total_encontrados += len(leads_scored)
+                
+                # Atualiza progresso
+                progress_bar.progress((idx + 1) / total_cidades, text=f"Processando {cidade_nome}... ({idx+1}/{total_cidades})")
+                
+                if os.getenv("DEBUG_ROTA", "0") == "1":
+                    t_cidade = perf_counter() - t_cidade_start
+                    print(f"[DEBUG_ROTA] Cidade {cidade_nome}: busca={t_cidade-t_scoring:.2f}s, scoring={t_scoring:.2f}s, leads={count_local}")
+            
+            t_busca = perf_counter() - t_busca_start
+            progress_bar.empty()
+            
+            if os.getenv("DEBUG_ROTA", "0") == "1":
+                print(f"[DEBUG_ROTA] Busca total de leads: {t_busca:.2f}s | Total encontrados: {total_encontrados}")
 
             if total_encontrados == 0:
                 st.warning(Icons.ALERTA + "Nenhum lead encontrado para as cidades selecionadas.")
@@ -176,6 +206,7 @@ def render_tab_rota():
                         pass
 
             # Seleciona top 1 por cidade e completa por score geral
+            t_selecao_start = perf_counter()
             selecionados: List = []
             for chave, lista in leads_por_cidade.items():
                 if lista:
@@ -192,11 +223,21 @@ def render_tab_rota():
                     restantes = dedupe_leads_por_cnpj_basico(restantes)
                 restantes_sorted = sorted(restantes, key=lambda x: x.score, reverse=True)
                 selecionados.extend(restantes_sorted[:vagas])
+            t_selecao = perf_counter() - t_selecao_start
 
             # Gera rota e salva
+            t_rota_start = perf_counter()
             rota = planejar_rota(selecionados, dias_de_rota, visitas_por_dia, cidade_base, uf_base)
+            t_rota = perf_counter() - t_rota_start
+            
             st.session_state['rota_planejada'] = rota
             st.session_state['leads_rota'] = selecionados
+            
+            t_total = perf_counter() - t_total_start
+            import os
+            if os.getenv("DEBUG_ROTA", "0") == "1":
+                print(f"[DEBUG_ROTA] Seleção: {t_selecao:.2f}s | Planejamento rota: {t_rota:.2f}s | Total: {t_total:.2f}s")
+            
             st.success(Icons.SUCESSO + f" Rota gerada com {rota.total_visitas} visitas em {rota.total_dias} dias!")
 
     st.divider()

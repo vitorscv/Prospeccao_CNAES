@@ -4,14 +4,16 @@ Todas as queries são parametrizadas para evitar SQL injection.
 """
 from __future__ import annotations
 
+import os
 from datetime import date
+from time import perf_counter
 from typing import List, Optional
 
 from src.database.connection import get_connection
 from src.models.lead import Endereco, Lead
 
-# Flag de debug (desativar em produção)
-DEBUG_ROTA = False
+# Flag de debug controlada por env var (DEBUG_ROTA=1 para ativar)
+DEBUG_ROTA = os.getenv("DEBUG_ROTA", "0") == "1"
 
 
 def buscar_leads_enriquecidos(
@@ -34,11 +36,14 @@ def buscar_leads_enriquecidos(
     Returns:
         Lista de objetos Lead enriquecidos
     """
+    t0 = perf_counter()
     con = get_connection()
     if not con:
         return []
     
     try:
+        t_conn = perf_counter() - t0
+        
         # Debug: contagens progressivas para diagnóstico
         if DEBUG_ROTA:
             count_total = con.execute("SELECT COUNT(*) FROM estabelecimentos").fetchone()[0]
@@ -85,9 +90,10 @@ def buscar_leads_enriquecidos(
             if codigo_cidade:
                 # Normaliza código do município para string com zeros à esquerda se necessário
                 codigo_str = str(codigo_cidade[0]).strip()
-                # Usa LPAD + TRIM para normalizar formato (zeros à esquerda, comprimento fixo)
-                filtro_cidade = f"AND LPAD(TRIM(CAST(e.municipio AS VARCHAR)), {MUNICIPIO_CODE_LENGTH}, '0') = LPAD(TRIM(CAST(? AS VARCHAR)), {MUNICIPIO_CODE_LENGTH}, '0')"
-                params.append(codigo_str)
+                codigo_normalizado = codigo_str.zfill(MUNICIPIO_CODE_LENGTH)  # Normaliza parâmetro uma vez
+                # Usa coluna normalizada da CTE (municipio_norm) para melhor performance
+                filtro_cidade = f"AND e.municipio_norm = ?"
+                params.append(codigo_normalizado)
                 
                 if DEBUG_ROTA:
                     # Debug: distribuição de comprimentos
@@ -129,11 +135,20 @@ def buscar_leads_enriquecidos(
             except Exception as debug_e:
                 print(f"[DEBUG_ROTA] Erro na contagem debug: {debug_e}")
         
-        # Query principal
-        # Normaliza CNAE no WHERE para matching consistente (remove pontos/hífens)
-        # JOIN com cnaes usa código normalizado (cnaes.codigo já vem sem formatação)
-        # JOIN com municipios usa LPAD+TRIM para normalizar zeros à esquerda e comprimentos
+        # Query principal otimizada: usa CTE para normalizar uma vez (evita recalcular REPLACE/LPAD por linha)
+        # Normaliza CNAE e município na CTE para melhor performance
+        t_query_start = perf_counter()
         query = f"""
+            WITH estabelecimentos_norm AS (
+                SELECT 
+                    e.*,
+                    REPLACE(REPLACE(REPLACE(e.cnae_principal, '.', ''), '-', ''), '/', '') AS cnae_norm,
+                    LPAD(TRIM(CAST(e.municipio AS VARCHAR)), {MUNICIPIO_CODE_LENGTH}, '0') AS municipio_norm
+                FROM estabelecimentos e
+                WHERE e.situacao_cadastral = '02'
+                {filtro_uf}
+                {filtro_matriz}
+            )
             SELECT 
                 e.cnpj_basico || e.cnpj_ordem || e.cnpj_dv AS cnpj,
                 e.cnpj_basico,
@@ -154,14 +169,11 @@ def buscar_leads_enriquecidos(
                 e.telefone_2,
                 e.correio_eletronico AS email,
                 e.data_inicio_atividade
-            FROM estabelecimentos e
-            LEFT JOIN municipios m ON LPAD(TRIM(CAST(e.municipio AS VARCHAR)), {MUNICIPIO_CODE_LENGTH}, '0') = LPAD(TRIM(CAST(m.codigo AS VARCHAR)), {MUNICIPIO_CODE_LENGTH}, '0')
-            LEFT JOIN cnaes c ON REPLACE(REPLACE(REPLACE(e.cnae_principal, '.', ''), '-', ''), '/', '') = REPLACE(REPLACE(REPLACE(c.codigo, '.', ''), '-', ''), '/', '')
-            WHERE REPLACE(REPLACE(REPLACE(e.cnae_principal, '.', ''), '-', ''), '/', '') IN ({placeholders_cnae})
-            AND e.situacao_cadastral = '02'
-            {filtro_uf}
+            FROM estabelecimentos_norm e
+            LEFT JOIN municipios m ON e.municipio_norm = LPAD(TRIM(CAST(m.codigo AS VARCHAR)), {MUNICIPIO_CODE_LENGTH}, '0')
+            LEFT JOIN cnaes c ON e.cnae_norm = REPLACE(REPLACE(REPLACE(c.codigo, '.', ''), '-', ''), '/', '')
+            WHERE e.cnae_norm IN ({placeholders_cnae})
             {filtro_cidade}
-            {filtro_matriz}
             LIMIT ?
         """
         
@@ -169,9 +181,10 @@ def buscar_leads_enriquecidos(
         
         # Executa query
         rows = con.execute(query, params).fetchall()
+        t_query = perf_counter() - t_query_start
         
         if DEBUG_ROTA:
-            print(f"[DEBUG_ROTA] Query retornou {len(rows)} linhas")
+            print(f"[DEBUG_ROTA] Query retornou {len(rows)} linhas em {t_query:.2f}s (conn: {t_conn:.3f}s)")
         
         con.close()
         
@@ -241,6 +254,12 @@ def buscar_leads_enriquecidos(
             )
             
             leads.append(lead)
+        
+        t_map = perf_counter() - t_map_start
+        t_total = perf_counter() - t0
+        
+        if DEBUG_ROTA:
+            print(f"[DEBUG_ROTA] Mapeamento: {t_map:.2f}s | Total: {t_total:.2f}s | Leads: {len(leads)}")
         
         return leads
         
