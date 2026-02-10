@@ -73,9 +73,13 @@ def render_tab_rota():
             index=0,
         )
         cidades_input = None
-        if modo_rota.endswith("existente"):
+        # detecta corretamente o modo "rota existente" (mais robusto que endswith)
+        cidades_selecionadas = []
+        if "rota existente" in modo_rota.lower():
             op_cidades = listar_cidades_do_banco(uf_base) if uf_base else []
-            cidades_selecionadas = st.multiselect("Cidades (escolha uma ou mais)", options=op_cidades)
+            cidades_selecionadas = st.multiselect(
+                "Cidades (escolha uma ou mais)", options=op_cidades, key="rota_cidades_selecionadas"
+            )
         else:
             cidades_input = st.text_area("Lista de cidades para rota (uma por linha, opcional)", height=80)
 
@@ -119,13 +123,9 @@ def render_tab_rota():
                     uf = parts[1].strip() if len(parts) > 1 else uf_base
                     cidades_alvo.append((cidade, uf))
             else:
-                # rota existente via multiselect de cidades quando disponível
-                if uf_base:
-                    op = listar_cidades_do_banco(uf_base)
-                    escolhas = st.multiselect("Cidades para rota (selecione)", options=op)
-                    if not escolhas:
-                        st.warning(Icons.ALERTA + "Forneça cidades para usar a rota existente.")
-                        return
+                # rota existente via multiselect (renderizado fora do clique) ou via input manual
+                escolhas = cidades_selecionadas or []
+                if escolhas:
                     for escolha in escolhas:
                         cidades_alvo.append((escolha, uf_base))
                 else:
