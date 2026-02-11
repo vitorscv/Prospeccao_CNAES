@@ -103,7 +103,7 @@ with aba1:
 with aba2:
     st.header("Resultado da Busca")
     
-    # Inicializa session_state se não existir
+
     if 'resultados_busca' not in st.session_state:
         st.session_state.resultados_busca = None
     if 'filtros_busca' not in st.session_state:
@@ -126,11 +126,11 @@ with aba2:
                     'cidade': cidade
                 }
     
-    # Usa os resultados do session_state se existirem
+    
     resultados = st.session_state.resultados_busca
     
     if resultados:
-        # --- PARTE A: MÉTRICAS (Igual antes) ---
+        # PARTE A: MÉTRICAS
         total = len(resultados)
         com_email = sum(1 for r in resultados if r.email)
         com_tel = sum(1 for r in resultados if r.telefone_principal)
@@ -142,7 +142,7 @@ with aba2:
         
         st.divider()
 
-        # --- PARTE B: BOTÃO BAIXAR TUDO ---
+        # PARTE B: BOTÃO BAIXAR TUDO 
         col_txt, col_btn = st.columns([3, 1])
         with col_txt:
             st.info(Icons.BUSCAR + " Selecione as empresas na tabela para enviar ao CRM ou baixar separado.")
@@ -162,7 +162,7 @@ with aba2:
             st.session_state.filtros_busca = None
             st.rerun()
 
-        # --- PARTE C: TABELA COM CHECKBOX ---
+        #  PARTE C: TABELA COM CHECKBOX
         df_view = pd.DataFrame([vars(r) for r in resultados])
         
         # Filtra colunas visíveis
@@ -178,7 +178,8 @@ with aba2:
             key="grid_principal"
         )
         
-        # --- PARTE D: AÇÕES DOS SELECIONADOS ---
+        #  PARTE D: AÇÕES DOS SELECIONADOS 
+
         indices = evento.selection.rows
         
         if indices:
@@ -217,7 +218,7 @@ with aba3:
 with aba4:
     render_tab_rota()
 
-# --- ABA 5: DASHBOARD EXECUTIVO ---
+# ABA 5: DASHBOARD
 with aba5:
     st.header(Icons.ABA_DASH + " Dashboard Executivo - Inteligência de Mercado")
     st.caption("Análise estratégica de oportunidades e expansão territorial")
@@ -228,7 +229,7 @@ with aba5:
     lista_estados_filtro = None if estado == "BRASIL" else [estado]
     lista_cidades_filtro = None if cidade == "TODAS" else [cidade]
     
-    # Busca dados usando os filtros da sidebar principal
+    
     with st.spinner(Icons.CARREGANDO + " Carregando dados do dashboard..."):
         dados_dash = buscar_dados_dashboard_executivo(
             lista_estados=lista_estados_filtro,
@@ -241,7 +242,7 @@ with aba5:
     else:
         kpis = dados_dash['kpis'].iloc[0]
         
-        # ========== LINHA 1: BIG NUMBERS / KPIs ==========
+        # BIG NUMBERS / KPIs
         st.markdown("---")
         st.markdown("### " + Icons.ABA_DASH + " Indicadores Principais")
         
@@ -276,13 +277,13 @@ with aba5:
         
         st.markdown("---")
         
-        # ========== LINHA 2: MAPA GEOGRÁFICO ==========
+        #  MAPA GEOGRÁFICO
         if dados_dash.get('mapa') is not None and not dados_dash['mapa'].empty:
             st.markdown("### " + Icons.ABA_DASH + " Inteligência Geográfica - Distribuição de Oportunidades")
             
             df_mapa = dados_dash['mapa'].copy()
             
-            # Coordenadas aproximadas por UF (centro do estado)
+            # Coordenadas aproximadas por UF
             coordenadas_uf = {
                 'AC': (-9.0238, -70.8120), 'AL': (-9.5713, -36.7820), 'AP': (1.4144, -51.7865),
                 'AM': (-4.2633, -65.2432), 'BA': (-12.9714, -38.5014), 'CE': (-3.7172, -38.5433),
@@ -295,17 +296,17 @@ with aba5:
                 'SP': (-23.5505, -46.6333), 'SE': (-10.5741, -37.3857), 'TO': (-10.1753, -48.2982)
             }
             
-            # Adiciona coordenadas aproximadas (centro da cidade baseado no estado)
+            # Adiciona coordenadas aproximadas
             df_mapa['lat'] = df_mapa['uf'].map(lambda x: coordenadas_uf.get(x, (-14.2350, -51.9253))[0])
             df_mapa['lon'] = df_mapa['uf'].map(lambda x: coordenadas_uf.get(x, (-14.2350, -51.9253))[1])
             
-            # Adiciona pequena variação para não sobrepor pontos
+           
             import numpy as np
             np.random.seed(42)
             df_mapa['lat'] = df_mapa['lat'] + np.random.normal(0, 0.5, len(df_mapa))
             df_mapa['lon'] = df_mapa['lon'] + np.random.normal(0, 0.5, len(df_mapa))
             
-            # Cria mapa scatter
+      
             if not PLOTLY_AVAILABLE:
                 st.error("Plotly não está disponível. Instale com: pip install plotly")
             else:
@@ -332,12 +333,12 @@ with aba5:
         
         st.markdown("---")
         
-        # ========== LINHA 3: ANÁLISE DE MERCADO ==========
+        #  ANÁLISE DE MERCADO 
         st.markdown(Icons.ABA_DASH + " Análise de Mercado")
         
         col_graf1, col_graf2 = st.columns(2)
         
-        # Gráfico 1: Top 10 Cidades (Barras Horizontais)
+        # Gráfico 1: Top 10 Cidades 
         with col_graf1:
             if dados_dash.get('top10_cidades') is not None and not dados_dash['top10_cidades'].empty:
                 st.markdown(Icons.ABA_DASH + " Top 10 Cidades com Maior Potencial")
@@ -366,13 +367,13 @@ with aba5:
             else:
                 st.info("Sem dados suficientes para Top 10")
         
-        # Gráfico 2: Distribuição por CNAE/Setor (Treemap ou Donut)
+        # Gráfico 2: Distribuição por CNAE/Setor 
         with col_graf2:
             if dados_dash.get('distribuicao_cnae') is not None and not dados_dash['distribuicao_cnae'].empty:
                 st.markdown(Icons.ABA_DASH + " Distribuição por Setor (CNAE)")
                 df_cnae = dados_dash['distribuicao_cnae'].copy()
                 
-                # Treemap
+                
                 if not PLOTLY_AVAILABLE:
                     st.bar_chart(df_cnae.set_index('setor')['total'])
                 else:
@@ -395,7 +396,7 @@ with aba5:
         
         st.markdown("---")
         
-        # ========== LINHA 4: DISTRIBUIÇÃO POR ESTADO ==========
+        # DISTRIBUIÇÃO POR ESTADO
         if dados_dash.get('distribuicao_uf') is not None and not dados_dash['distribuicao_uf'].empty:
             st.markdown(Icons.ABA_DASH + " Distribuição por Estado")
             df_uf = dados_dash['distribuicao_uf'].copy()
@@ -428,4 +429,3 @@ with aba5:
                     percentual_lider = (df_uf.iloc[0]['total'] / df_uf['total'].sum() * 100)
                     st.metric(Icons.INFO + " Participação do Líder", f"{percentual_lider:.1f}%")
 
-# Analytics removed per user request.

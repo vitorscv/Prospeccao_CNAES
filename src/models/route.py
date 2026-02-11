@@ -54,18 +54,17 @@ class RouteDayPlan:
         
         from urllib.parse import quote
         
-        # Pega apenas stops com endereço completo
+        
         stops_com_endereco = [s for s in self.stops if s.lead.endereco and s.lead.endereco.completo]
         
         if not stops_com_endereco:
             return ""
         
-        # Google Maps permite até 10 waypoints
-        # Se tiver mais, dividir em múltiplos links
-        max_waypoints = 9  # origem + 9 waypoints + destino = 11 pontos
+        
+        max_waypoints = 9 
         
         if len(stops_com_endereco) <= max_waypoints + 1:
-            # Cabe em um link só
+            
             origin = stops_com_endereco[0].lead.endereco.google_maps_query
             destination = stops_com_endereco[-1].lead.endereco.google_maps_query
             
@@ -80,8 +79,8 @@ class RouteDayPlan:
             
             return url
         else:
-            # Precisa dividir em múltiplos links
-            # Retorna apenas o primeiro link com aviso
+            
+    
             origin = stops_com_endereco[0].lead.endereco.google_maps_query
             destination = stops_com_endereco[max_waypoints].lead.endereco.google_maps_query
             

@@ -62,14 +62,14 @@ class Endereco:
 class Lead:
     """Lead enriquecido com todos os dados necessários para prospecção."""
     
-    # Identificação (campos obrigatórios primeiro)
+    # Identificação
     cnpj: str
     cnpj_basico: str
     nome_fantasia: str
     cnae_principal: str
     descricao_cnae: str
     
-    # Campos com valores padrão (devem vir depois dos obrigatórios)
+    # Campos com valores padrão 
     razao_social: Optional[str] = None
     cnaes_secundarios: list[str] = field(default_factory=list)
     matriz_filial: str = "FILIAL"  # "MATRIZ" ou "FILIAL"
