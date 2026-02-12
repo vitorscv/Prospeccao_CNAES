@@ -35,27 +35,27 @@ def planejar_rota(
     Returns:
         RoutePlan com distribuição de visitas por dia
     """
-    # Filtra apenas leads visitáveis
+    
     leads_visitaveis = [lead for lead in leads if lead.visitavel]
     
     if not leads_visitaveis:
-        # Se não há leads visitáveis, retorna plano vazio
+        
         return RoutePlan(dias=[], cidade_base=cidade_base, uf_base=uf_base)
     
-    # Agrupa leads por localização (cidade + bairro)
+   
     grupos_localizacao = _agrupar_por_localizacao(leads_visitaveis)
     
-    # Ordena grupos por densidade (quantidade de leads) e score médio
+    
     grupos_ordenados = _ordenar_grupos_por_prioridade(grupos_localizacao)
     
-    # Distribui leads em dias
+    
     dias: List[RouteDayPlan] = []
     lead_index = 0
     
     for dia_num in range(1, dias_de_rota + 1):
         stops: List[RouteStop] = []
         
-        # Preenche o dia com visitas
+        
         for ordem in range(1, visitas_por_dia + 1):
             if lead_index >= len(grupos_ordenados):
                 break
@@ -126,7 +126,7 @@ def _ordenar_grupos_por_prioridade(
     Returns:
         Lista flat de leads ordenados
     """
-    # Calcula prioridade de cada grupo
+   
     grupos_com_prioridade: List[tuple[float, int, List[LeadScored]]] = []
     
     for leads_grupo in grupos.values():
@@ -134,13 +134,13 @@ def _ordenar_grupos_por_prioridade(
         quantidade = len(leads_grupo)
         grupos_com_prioridade.append((score_medio, quantidade, leads_grupo))
     
-    # Ordena por score médio (desc) e quantidade (desc)
+    
     grupos_com_prioridade.sort(key=lambda x: (x[0], x[1]), reverse=True)
     
-    # Flatten: retorna lista de leads ordenados
+    
     leads_ordenados: List[LeadScored] = []
     for _, _, leads_grupo in grupos_com_prioridade:
-        # Dentro do grupo, ordena por score individual
+        
         leads_grupo_sorted = sorted(leads_grupo, key=lambda x: x.score, reverse=True)
         leads_ordenados.extend(leads_grupo_sorted)
     
@@ -165,13 +165,13 @@ def otimizar_rota_por_proximidade(
     if len(dia_plan.stops) <= 1:
         return dia_plan
     
-    # Ordena stops por CEP (aproximação de proximidade)
+   
     stops_ordenados = sorted(
         dia_plan.stops,
         key=lambda s: s.lead.endereco.cep if s.lead.endereco else ""
     )
     
-    # Atualiza ordem
+
     for i, stop in enumerate(stops_ordenados, start=1):
         stop.ordem = i
     

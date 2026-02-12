@@ -30,7 +30,7 @@ def calcular_score_lead(
     score = 0
     reasons: List[str] = []
     
-    # 1. Fit por CNAE/Segmento
+   
     segmento = get_segmento_by_cnae(lead.cnae_principal)
     segmento_nome = None
     
@@ -43,7 +43,7 @@ def calcular_score_lead(
             score += weights.segmento_aderente
             reasons.append(f"Segmento aderente: {segmento.nome} (+{weights.segmento_aderente})")
     
-    # 2. Visitável (contato/endereço)
+    
     if lead.telefone_principal:
         score += weights.telefone_valido
         reasons.append(f"Telefone principal válido (+{weights.telefone_valido})")
@@ -60,7 +60,7 @@ def calcular_score_lead(
         score += weights.endereco_completo
         reasons.append(f"Endereço completo (+{weights.endereco_completo})")
     
-    # 3. Maturidade
+    
     anos = lead.anos_atividade
     if anos >= 8:
         score += weights.anos_8_ou_mais
@@ -69,13 +69,13 @@ def calcular_score_lead(
         score += weights.anos_3_ou_mais
         reasons.append(f"Empresa com {anos} anos de atividade (+{weights.anos_3_ou_mais})")
     
-    # 4. Matriz vs Filial
+    
     if lead.matriz_filial == "MATRIZ":
         score += weights.matriz
         reasons.append(f"Matriz da empresa (+{weights.matriz})")
     
-    # Cria LeadScored
-    # Copia todos os atributos do Lead original
+
+
     lead_scored = LeadScored(
         cnpj=lead.cnpj,
         cnpj_basico=lead.cnpj_basico,
@@ -118,11 +118,11 @@ def qualificar_leads(
     """
     leads_scored = [calcular_score_lead(lead, weights) for lead in leads]
     
-    # Filtra por score mínimo
+    
     if score_minimo > 0:
         leads_scored = [ls for ls in leads_scored if ls.score >= score_minimo]
     
-    # Ordena por score (maior primeiro)
+    
     leads_scored.sort(key=lambda x: x.score, reverse=True)
     
     return leads_scored

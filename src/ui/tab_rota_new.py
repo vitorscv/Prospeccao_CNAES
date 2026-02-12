@@ -27,7 +27,7 @@ def render_tab_rota():
     st.header(Icons.ABA_PROSPECT + " Planejador de Rota do Representante")
     st.caption("Forneça uma rota (lista de cidades) ou deixe o sistema gerar automaticamente.")
 
-    # ===== SEÇÃO 1: CONFIGURAÇÃO DA ROTA =====
+    # CONFIGURAÇÃO DA ROTA
     st.markdown("### " + Icons.BUSCAR + " Configuração da Rota")
     col1, col2 = st.columns(2)
 
@@ -47,7 +47,7 @@ def render_tab_rota():
 
     st.divider()
 
-    # ===== SEÇÃO 2: FILTROS DE LEADS =====
+    # FILTROS DE LEADS
     st.markdown("### " + Icons.ABA_CNAE + " Filtros de Leads")
     col1, col2 = st.columns(2)
 
@@ -74,7 +74,6 @@ def render_tab_rota():
             index=0,
         )
         cidades_input = None
-        # detecta corretamente o modo "rota existente" (mais robusto que endswith)
         cidades_selecionadas = []
         if "rota existente" in modo_rota.lower():
             op_cidades = listar_cidades_do_banco(uf_base) if uf_base else []
@@ -86,7 +85,7 @@ def render_tab_rota():
 
     st.divider()
 
-    # ===== SEÇÃO 3: GERAR ROTA =====
+    # GERAR ROTA
     if st.button(Icons.BUSCAR + " GERAR ROTA", type="primary", use_container_width=True):
         if not cidade_base or not uf_base:
             st.error(Icons.ALERTA + " Preencha a cidade base e UF!")
@@ -126,7 +125,7 @@ def render_tab_rota():
                     uf = parts[1].strip() if len(parts) > 1 else uf_base
                     cidades_alvo.append((cidade, uf))
             else:
-                # rota existente via multiselect (renderizado fora do clique) ou via input manual
+                # rota existente via multiselect ou input manual
                 escolhas = cidades_selecionadas or []
                 if escolhas:
                     for escolha in escolhas:
@@ -195,7 +194,7 @@ def render_tab_rota():
                     pass
                 return
             else:
-                # mostra cidades com zero encontrados (opcional)
+                
                 zeros = {k: v for k, v in counts_by_city.items() if v == 0}
                 if zeros:
                     st.info(f"Algumas cidades não retornaram leads: {len(zeros)} (veja tabela abaixo)")
@@ -205,7 +204,6 @@ def render_tab_rota():
                     except Exception:
                         pass
 
-            # Seleciona top 1 por cidade e completa por score geral
             t_selecao_start = perf_counter()
             selecionados: List = []
             for chave, lista in leads_por_cidade.items():
@@ -225,7 +223,6 @@ def render_tab_rota():
                 selecionados.extend(restantes_sorted[:vagas])
             t_selecao = perf_counter() - t_selecao_start
 
-            # Gera rota e salva
             t_rota_start = perf_counter()
             rota = planejar_rota(selecionados, dias_de_rota, visitas_por_dia, cidade_base, uf_base)
             t_rota = perf_counter() - t_rota_start
@@ -242,7 +239,7 @@ def render_tab_rota():
 
     st.divider()
 
-    # ===== SEÇÃO 4: EXIBIR ROTA =====
+    # EXIBIR ROTA
     if 'rota_planejada' in st.session_state:
         rota = st.session_state['rota_planejada']
         st.markdown("### " + Icons.ABA_DASH + " Rota Planejada")
@@ -256,7 +253,7 @@ def render_tab_rota():
 
         st.divider()
 
-        # Mapa aproximado por UF (centroides)
+        # Mapa aproximado por UF
         coordenadas_uf = {
             'AC': (-9.0238, -70.8120), 'AL': (-9.5713, -36.7820), 'AP': (1.4144, -51.7865),
             'AM': (-4.2633, -65.2432), 'BA': (-12.9714, -38.5014), 'CE': (-3.7172, -38.5433),

@@ -7,7 +7,7 @@ class Icons:
     SALVAR = ":material/save:"
     COPIAR = ":material/content_copy:"
     
-    # Navegação (Abas)
+    # Navegação 
     ABA_CNAE = ":material/manage_search:"
     ABA_PROSPECT = ":material/public:"
     ABA_CRM = ":material/work:"

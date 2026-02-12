@@ -96,7 +96,7 @@ def gerar_excel_leads_enriquecidos(leads: List[Lead | LeadScored]) -> bytes:
             'Link Google Maps': lead.link_maps,
         }
         
-        # Se for LeadScored, adiciona campos de score
+      
         if isinstance(lead, LeadScored):
             linha['Score'] = lead.score
             linha['Segmento'] = lead.segmento or ''
@@ -112,16 +112,15 @@ def gerar_excel_leads_enriquecidos(leads: List[Lead | LeadScored]) -> bytes:
         workbook = writer.book
         worksheet = writer.sheets['Leads']
         
-        # Formato texto para todas as colunas
+
         formato = workbook.add_format({'num_format': '@', 'align': 'left', 'valign': 'vcenter'})
         
-        # Ajusta largura das colunas
         for i, col in enumerate(df.columns):
             max_len = max(
                 df[col].astype(str).map(len).max(),
                 len(col)
             )
-            # Limita largura máxima
+            
             width = min(max_len + 2, 50)
             worksheet.set_column(i, i, width, formato)
     
@@ -129,7 +128,7 @@ def gerar_excel_leads_enriquecidos(leads: List[Lead | LeadScored]) -> bytes:
 
 
 def gerar_excel_roteiro(
-    route_plan: Any,  # RoutePlan
+    route_plan: Any,  
     incluir_links: bool = True
 ) -> bytes:
     """
@@ -144,7 +143,7 @@ def gerar_excel_roteiro(
     """
     output = BytesIO()
     
-    # Converte roteiro para lista de dicionários
+    
     dados: List[Dict[str, Any]] = []
     
     for dia_plan in route_plan.dias:
@@ -183,7 +182,7 @@ def gerar_excel_roteiro(
         # Formato texto
         formato = workbook.add_format({'num_format': '@', 'align': 'left', 'valign': 'vcenter'})
         
-        # Ajusta largura das colunas
+        
         for i, col in enumerate(df.columns):
             max_len = max(
                 df[col].astype(str).map(len).max(),
@@ -192,7 +191,7 @@ def gerar_excel_roteiro(
             width = min(max_len + 2, 50)
             worksheet.set_column(i, i, width, formato)
         
-        # Adiciona uma aba com resumo por dia
+        
         resumo_dados = []
         for dia_plan in route_plan.dias:
             resumo_dados.append({
