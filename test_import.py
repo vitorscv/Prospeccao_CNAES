@@ -1,8 +1,6 @@
 """Script de teste para verificar importações."""
 try:
-    from src.models.lead import Lead, LeadScored
-    print("✓ Modelos Lead importados com sucesso")
-    
+    # Verifica serviços essenciais (omitindo modelos removidos)
     from src.services.scoring_service import calcular_score_lead
     print("✓ Scoring service importado com sucesso")
     
@@ -12,7 +10,7 @@ try:
     from src.database.estabelecimentos_repository import buscar_leads_enriquecidos
     print("✓ Estabelecimentos repository importado com sucesso")
     
-    print("\n✅ Todas as importações funcionaram!")
+    print("\n✅ Importações essenciais funcionaram!")
     
 except Exception as e:
     print(f"❌ Erro: {e}")

@@ -7,10 +7,10 @@ from __future__ import annotations
 import os
 from datetime import date
 from time import perf_counter
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from src.database.connection import get_connection
-from src.models.lead import Endereco, Lead
+# removed dependency on src.models.lead (Lead / Endereco)
 
 # Flag de debug controlada por env var (DEBUG_ROTA=1 para ativar)
 DEBUG_ROTA = os.getenv("DEBUG_ROTA", "0") == "1"

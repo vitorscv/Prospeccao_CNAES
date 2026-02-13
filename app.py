@@ -11,7 +11,6 @@ from src.database.repository import buscar_empresas_dto, buscar_cnae_por_texto, 
 from src.database.crm_repository import adicionar_lista_ao_crm
 from src.services.excel_service import gerar_excel_de_dtos
 from src.ui.tab_crm import render_tab_crm
-from src.ui.tab_rota_new import render_tab_rota
 #  CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Hunter Leads", layout="wide", page_icon=Icons.LOGO_PAGINA)
 
@@ -77,11 +76,10 @@ with st.sidebar:
 st.title(Icons.LOGO_PAGINA + " Hunter Leads - Pantex")
 
 # ABAS 
-aba1, aba2, aba3, aba4, aba5 = st.tabs([
+aba1, aba2, aba3, aba4 = st.tabs([
     Icons.ABA_CNAE + " Descobrir Código", 
     Icons.ABA_PROSPECT + " Gerar Leads", 
     Icons.ABA_CRM + " Meu Pipeline",
-    Icons.ABA_PROSPECT + " Rota",
     Icons.ABA_DASH + " Dashboard",
 ])
 
@@ -214,12 +212,8 @@ with aba2:
 with aba3:
     render_tab_crm()
 
-# ABA 4: ROTA
+# ABA 4: DASHBOARD
 with aba4:
-    render_tab_rota()
-
-# ABA 5: DASHBOARD
-with aba5:
     st.header(Icons.ABA_DASH + " Dashboard Executivo - Inteligência de Mercado")
     st.caption("Análise estratégica de oportunidades e expansão territorial")
     st.info(Icons.INFO + " Use os filtros da barra lateral para personalizar a análise.")
