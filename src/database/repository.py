@@ -574,3 +574,87 @@ def listar_cnaes_disponiveis(termo_busca=None, limite=100):
         if con:
             con.close()
         return pd.DataFrame()
+
+
+# NOVAS FUNÇÕES SOLICITADAS PELO TAB_ROTA.PY
+def listar_cidades_disponiveis():
+    """
+    Retorna lista ordenada de cidades (descrição) disponíveis no banco.
+    """
+    con = get_connection()
+    if not con:
+        return []
+    try:
+        query = "SELECT DISTINCT descricao FROM municipios ORDER BY descricao"
+        rows = con.execute(query).fetchall()
+        con.close()
+        return [r[0] for r in rows]
+    except Exception:
+        try:
+            con.close()
+        except:
+            pass
+        return []
+
+
+def buscar_leads_por_cidade_e_cnae(cidades: list, cnaes: list):
+    """
+    Busca leads filtrando por lista de cidades (descrições) e lista de CNAE (descrições).
+    Retorna um pandas.DataFrame pronto para exibição.
+    Se `cnaes` for vazio, busca todos os CNAEs nas cidades fornecidas.
+    """
+    con = get_connection()
+    if not con:
+        return pd.DataFrame()
+
+    try:
+        # Filtra cidades: primeiro busca os códigos das cidades na tabela municipios
+        cidades_safe = [c.replace("'", "''") for c in cidades]
+        codigos = []
+        for cid in cidades_safe:
+            try:
+                res = con.execute(f"SELECT codigo FROM municipios WHERE descricao = '{cid}' LIMIT 1").fetchone()
+                if res:
+                    codigos.append(str(res[0]))
+            except:
+                pass
+
+        if not codigos:
+            con.close()
+            return pd.DataFrame()
+
+        codigos_sql = "', '".join(codigos)
+
+        filtro_cnae = ""
+        if cnaes and len(cnaes) > 0:
+            # Assume que cnaes vem como descrições; buscamos os códigos correspondentes
+            cnaes_safe = [c.replace("'", "''") for c in cnaes]
+            cnaes_descr_sql = "', '".join(cnaes_safe)
+            filtro_cnae = f"AND c.descricao IN ('{cnaes_descr_sql}')"
+
+        query = f"""
+            SELECT 
+                e.nome_fantasia AS nome_fantasia,
+                e.cnpj_basico || e.cnpj_ordem || e.cnpj_dv AS cnpj,
+                e.logradouro AS logradouro,
+                e.numero AS numero,
+                COALESCE(m.descricao, '') AS municipio,
+                e.uf AS uf,
+                COALESCE(c.descricao, '') AS cnae
+            FROM estabelecimentos e
+            LEFT JOIN municipios m ON e.municipio = m.codigo
+            LEFT JOIN cnaes c ON e.cnae_principal = c.codigo
+            WHERE e.situacao_cadastral = '02'
+            AND e.municipio IN ('{codigos_sql}')
+            {filtro_cnae}
+            LIMIT 50000
+        """
+        df = con.execute(query).df()
+        con.close()
+        return df
+    except Exception:
+        try:
+            con.close()
+        except:
+            pass
+        return pd.DataFrame()

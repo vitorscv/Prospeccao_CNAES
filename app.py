@@ -11,6 +11,7 @@ from src.database.repository import buscar_empresas_dto, buscar_cnae_por_texto, 
 from src.database.crm_repository import adicionar_lista_ao_crm
 from src.services.excel_service import gerar_excel_de_dtos
 from src.ui.tab_crm import render_tab_crm
+from src.ui.tab_rota import render_tab_rota
 #  CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Hunter Leads", layout="wide", page_icon=Icons.LOGO_PAGINA)
 
@@ -76,11 +77,12 @@ with st.sidebar:
 st.title(Icons.LOGO_PAGINA + " Hunter Leads - Pantex")
 
 # ABAS 
-aba1, aba2, aba3, aba4 = st.tabs([
+aba1, aba2, aba3, aba4, aba5 = st.tabs([
     Icons.ABA_CNAE + " Descobrir Código", 
     Icons.ABA_PROSPECT + " Gerar Leads", 
     Icons.ABA_CRM + " Meu Pipeline",
     Icons.ABA_DASH + " Dashboard",
+    "Rota",
 ])
 
 # ABA 1: DESCOBRIR CNAE 
@@ -211,6 +213,11 @@ with aba2:
 #ABA 3: pipeline
 with aba3:
     render_tab_crm()
+
+# ABA 5: ROTA / PLANEJAMENTO
+with aba5:
+    # A aba de rota agora busca seus próprios dados do banco; chamada sem argumentos.
+    render_tab_rota()
 
 # ABA 4: DASHBOARD
 with aba4:
