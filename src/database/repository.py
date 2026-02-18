@@ -636,6 +636,7 @@ def buscar_leads_por_cidade_e_cnae(cidades: list, cnaes: list):
             SELECT 
                 e.nome_fantasia AS nome_fantasia,
                 e.cnpj_basico || e.cnpj_ordem || e.cnpj_dv AS cnpj,
+                e.ddd_1 || ' ' || e.telefone_1 AS telefone,
                 e.logradouro AS logradouro,
                 e.numero AS numero,
                 COALESCE(m.descricao, '') AS municipio,

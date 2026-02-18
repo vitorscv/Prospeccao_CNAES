@@ -2,39 +2,114 @@ import streamlit as st
 import pandas as pd
 from urllib.parse import quote_plus
 
-# --- CONEXÃO COM O BANCO DE DADOS ---
+# CONEXÃO COM O BANCO DE DADOS              
 try:
     from src.database.repository import buscar_leads_por_cidade_e_cnae, listar_cidades_disponiveis, listar_cnaes_disponiveis
     BANCO_CONECTADO = True
 except ImportError:
     BANCO_CONECTADO = False
 
+def _higienizar_endereco(row) -> str:
+    """
+    Função auxiliar interna para limpar o endereço bruto da Receita.
+    Remove 'SN', '999', resolve Zona Rural e respeita a UF do banco.
+    """
+    # 1. Extração e Formatação Básica
+    rua = str(row.get('logradouro', '')).strip().title()
+    num = str(row.get('numero', '')).strip()
+    bairro = str(row.get('bairro', '')).strip().title()
+    cid = str(row.get('municipio', '')).strip().title()
+    uf = str(row.get('uf', '')).strip().upper() # Pega a UF exata do banco
+
+    # 2. Lista de "Sujeira" para remover
+    lixo_numeros = ['Sn', 'S/N', 'Sem Numero', 'Nan', 'None', '0', '00', '999', '111', '.', '-']
+    termos_rurais = ['Zona Rural', 'Pov', 'Povoado', 'Fazenda', 'Sitio', 'Estrada', 'Rodovia']
+
+    # Limpa Rua e Bairro se forem apenas pontos ou traços
+    if rua in ['.', '-', '']: rua = ""
+    if bairro in ['.', '-', '']: bairro = ""
+
+    # Limpa Número inválido
+    if num.title() in lixo_numeros:
+        num = ""
+    
+    # Se a rua for "Zona Rural" ou "Rodovia", remove o número para o Google achar pelo menos a área
+    if any(t in rua for t in termos_rurais):
+        num = ""
+
+    # 3. Montagem Inteligente (Fallback)
+    partes = []
+
+    # Se não tem rua (comum em cidade pequena), tenta usar o Bairro como referência
+    if not rua and bairro:
+        partes.append(bairro)
+    elif rua:
+        partes.append(rua)
+        if num: partes.append(num)
+    
+    # Adiciona a Cidade e UF
+    if cid:
+        # SE tiver UF válida (2 letras), usa. SE NÃO, manda só a cidade.
+        # ISSO CORRIGE O ERRO "TRINDADE - BA" (quando é PE)
+        if len(uf) == 2:
+            partes.append(f"{cid} - {uf}")
+        else:
+            partes.append(cid) 
+
+    # Junta tudo
+    endereco_limpo = ", ".join(partes)
+    
+    # Só retorna se o endereço for minimamente útil (mais de 5 letras)
+    return endereco_limpo if len(endereco_limpo) > 5 else None
+
+
 def gerar_link_google_maps(origem: str, leads_df: pd.DataFrame) -> str:
-    """Gera o link oficial de navegação do Google Maps com base no DataFrame filtrado."""
+    """
+    Gera o link oficial de navegação (DIR) usando endereços higienizados.
+    """
     if leads_df.empty:
         return "#"
         
-    enderecos = []
+    enderecos_validos = []
+    
+    # Aplica a higienização linha a linha
     for _, row in leads_df.iterrows():
-        rua = str(row.get('logradouro', '')).strip()
-        num = str(row.get('numero', '')).strip()
-        cid = str(row.get('municipio', '')).strip()
-        
-        endereco_completo = f"{rua}, {num}, {cid}, BA".strip(', ')
-        if len(endereco_completo) > 5:
-            enderecos.append(endereco_completo)
+        end = _higienizar_endereco(row)
+        if end:
+            enderecos_validos.append(end)
 
-    if not enderecos:
+    if not enderecos_validos:
         return "#"
 
-    destino = enderecos[-1]
-    meio_caminho = enderecos[:-1]
+    # Definição de rota
+    destino = enderecos_validos[-1]      # Último cliente = Destino Final
+    waypoints = enderecos_validos[:-1]   # Outros = Paradas
 
-    # Limite do Google: Corta se tiver mais de 9 paradas (waypoints)
+    # Limite de segurança da URL (aprox 9 paradas)
+    if len(waypoints) > 9:
+        waypoints = waypoints[:9]
+
+    # URL Oficial de Navegação Universal (Funciona melhor que a antiga)
+    base_url = "https://www.google.com/maps/dir/?api=1"
+    
+    params = f"&destination={quote_plus(destino)}"
+    
+    if origem:
+        params += f"&origin={quote_plus(origem)}"
+        
+    if waypoints:
+        waypoints_str = "|".join([quote_plus(p) for p in waypoints])
+        params += f"&waypoints={waypoints_str}"
+        
+    params += "&travelmode=driving"
+
+    return base_url + params
+
+    # Limite do Google
     if len(meio_caminho) > 9:
         meio_caminho = meio_caminho[:9]
 
-    # 🔥 AQUI ESTÁ A CORREÇÃO: Usando a API oficial de Direções do Google Maps
+    # Usando a API oficial de Direções do Google Maps  
     url = f"https://www.google.com/maps/dir/?api=1&origin={quote_plus(origem)}&destination={quote_plus(destino)}"
     
     if meio_caminho:
@@ -137,7 +212,7 @@ def render_tab_rota():
                     
                     if not df_cidade.empty:
                         with st.expander(f"📍 Parada: {cidade} ({len(df_cidade)} clientes)", expanded=True):
-                            # 🔥 AQUI: Adicionei o 'telefone' na lista de colunas preferidas
+            
                             colunas_ideais = ['nome_fantasia', 'telefone', 'logradouro', 'numero', 'cnae']
                             colunas_exibir = [c for c in colunas_ideais if c in df_cidade.columns]
                             
