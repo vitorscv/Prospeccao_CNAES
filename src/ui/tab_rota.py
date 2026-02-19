@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from urllib.parse import quote_plus
+from src.ui.icons import Icons
 
 # CONEXÃO COM O BANCO DE DADOS
 try:
@@ -183,235 +184,200 @@ def gerar_link_google_maps(origem: str, leads_df: pd.DataFrame) -> str:
 
 def render_tab_rota():
     """Renderiza a interface da aba de Rotas usando a base de dados."""
-    st.header("🗺️ Planejador de Rota Regional", divider="blue")
-    st.markdown("Otimize a viagem cruzando a rota com leads não prospectados da Receita Federal.")
+    
+    st.header(f"{Icons.MAPA} Planejador de Rota Regional", divider="blue")
 
     if not BANCO_CONECTADO:
-        st.error("🚨 Erro: Conexão com o banco de dados não encontrada.")
+        st.error(f"{Icons.ALARM} Erro: Conexão com o banco de dados não encontrada.")
         return
 
-    # layout centralizado: colunas externas atuam como espaçadores e coluna central contém form + resultados
+    # Usamos 98% da tela para um visual mais imersivo tipo Dashboard
     container = st.container()
-    spacer_left, center_col, spacer_right = container.columns([0.05, 0.9, 0.05])
-    inner_left, inner_right = center_col.columns([0.35, 0.65], gap="large")
-    # form dentro da coluna esquerda (usando container para evitar a borda do st.form)
-    with inner_left:
-        form_container = st.container()
-        with form_container:
-
-            cidades_selecionadas = []
-            cnaes_selecionados = []
-            cidade_partida = ""
-
-            st.subheader("1. Ponto de Partida")
-            
-            todas_cidades = listar_cidades_disponiveis()
-            if not todas_cidades:
-                todas_cidades = []
+    spacer_left, center_col, spacer_right = container.columns([0.01, 0.98, 0.01])
+    
+    with center_col:
+        # Divide a parte superior em: Filtros (30%) e Resultados (70%)
+        inner_left, inner_right = st.columns([0.6, 0.7], gap="large")
+        
+        # --- COLUNA ESQUERDA: CONFIGURAÇÃO ---
+        with inner_left:
+            with st.container(border=True):
+                st.markdown(f"#### {Icons.GEAR} Configurar Viagem")
+                form = st.form("form_rota", clear_on_submit=False)
                 
-            idx_padrao = todas_cidades.index("FEIRA DE SANTANA") if "FEIRA DE SANTANA" in todas_cidades else 0 if todas_cidades else None
-            
-            cidade_partida = st.selectbox(
-                "📍 De qual cidade o vendedor vai sair?", 
-                options=todas_cidades,
-                index=idx_padrao
-            )
-
-            st.write("")  # espaçamento
-
-            st.subheader("2. Destinos da Viagem")
-            cidades_selecionadas = st.multiselect(
-                "Selecione as cidades da rota (em ordem de parada):",
-                options=todas_cidades,
-                placeholder="Ex: Santa Bárbara, Serrinha..."
-            )
-
-            st.write("")  # espaçamento
-
-            st.subheader("3. Oportunidades Alvo")
-            
-            df_cnaes = listar_cnaes_disponiveis(limite=5000)
-            cnae_opcoes = []
-            mapa_cnaes = {} 
-            
-            if isinstance(df_cnaes, pd.DataFrame) and not df_cnaes.empty:
-                for _, row in df_cnaes.iterrows():
-                    cod = str(row.get('codigo', '')).strip()
-                    desc = str(row.get('descricao', '')).strip()
+                with form:
+                    todas_cidades = listar_cidades_disponiveis() or []
+                    idx_padrao = todas_cidades.index("FEIRA DE SANTANA") if "FEIRA DE SANTANA" in todas_cidades else 0
                     
-                    if cod:
-                        texto_exibicao = cod 
-                        cnae_opcoes.append(texto_exibicao)
-                        mapa_cnaes[texto_exibicao] = desc 
-        
-            cnaes_selecionados_visuais = st.multiselect(
-                "Quais códigos visitar?",
-                options=cnae_opcoes,
-                placeholder="Ex: 2392 (Use pontuação se precisar)"
-            )
+                    cidade_partida = st.selectbox(f"{Icons.PIN} Ponto de Partida", options=todas_cidades, index=idx_padrao)
+                    
+                    cidades_selecionadas = st.multiselect(
+                        f"{Icons.CITY} Cidades Destino (Ordem)",
+                        options=todas_cidades,
+                        placeholder="Selecione as cidades..."
+                    )
+
+                    st.divider()
+
+                    df_cnaes = listar_cnaes_disponiveis(limite=5000)
+                    cnae_opcoes = []
+                    mapa_cnaes = {} 
+                    
+                    if isinstance(df_cnaes, pd.DataFrame) and not df_cnaes.empty:
+                        for _, row in df_cnaes.iterrows():
+                            cod = str(row.get('codigo', '')).strip()
+                            desc = str(row.get('descricao', '')).strip()
+                            if cod:
+                                cnae_opcoes.append(cod)
+                                mapa_cnaes[cod] = desc 
+                    
+                    cnaes_visuais = st.multiselect(
+                        f"{Icons.FACTORY} Segmentos (CNAE)",
+                        options=cnae_opcoes,
+                        placeholder="Códigos"
+                    )
+                    cnaes_selecionados = [mapa_cnaes[c] for c in cnaes_visuais if c in mapa_cnaes]
+
+                    st.markdown("###")
+                    submit = st.form_submit_button(f"{Icons.COMPASS} Gerar Roteiro", type="primary", use_container_width=True)
+
+        # Lógica de Estado
+        if 'rota_gerada' not in st.session_state: st.session_state.rota_gerada = False
+        if 'mostrar_mapa_rota' not in st.session_state: st.session_state.mostrar_mapa_rota = False
+
+        if submit:
+            if not cidades_selecionadas:
+                st.toast(f"{Icons.WARNING} Selecione pelo menos uma cidade!", icon=Icons.WARNING)
+                st.session_state.rota_gerada = False
+                st.session_state.mostrar_mapa_rota = False
+            else:
+                st.session_state.rota_gerada = True
+                st.session_state.mostrar_mapa_rota = False # Reseta o mapa ao fazer nova busca
+
+        origem_maps = ""
+        # --- COLUNA DIREITA: RESULTADOS ---
+        with inner_right:
+            if st.session_state.rota_gerada:
+                with st.spinner("Analisando rota e buscando leads..."):
+                    df_rota = buscar_leads_por_cidade_e_cnae(cidades_selecionadas, cnaes_selecionados)
+
+                if df_rota.empty:
+                    st.warning("Nenhum cliente encontrado com esse perfil nas cidades selecionadas.")
+                else:
+                    st.success(f"{Icons.LOGO_PAGINA} **{len(df_rota)} oportunidades** encontradas na rota!", icon=Icons.CHECK)
+                    
+                    link_maps = "#"
+                    if cidade_partida:
+                        origem_maps = f"{cidade_partida}, BA"
+                        link_maps = gerar_link_google_maps(origem_maps, df_rota)
+
+                    st.markdown(f"##### {Icons.LISTA} Lista de Paradas")
+                    col_cidade = 'municipio' if 'municipio' in df_rota.columns else 'cidade'
+
+                    for cidade in cidades_selecionadas:
+                        df_cidade = df_rota[df_rota[col_cidade] == cidade]
+
+                        if not df_cidade.empty:
+                            with st.expander(f"{Icons.PIN} {cidade} ({len(df_cidade)} clientes)", expanded=False):
+                                cols_ideais = ['nome_fantasia', 'telefone', 'logradouro', 'numero', 'cnae']
+                                cols_exibir = [c for c in cols_ideais if c in df_cidade.columns]
+                                st.dataframe(df_cidade[cols_exibir], use_container_width=True, hide_index=True)
+                    
+                    st.divider()
+
+                    # Botões de Ação na Direita
+                    c_btn1, c_btn2 = st.columns(2)
+                    with c_btn1:
+                        if cidade_partida:
+                            st.link_button(f"{Icons.PHONE} Abrir GPS (Google Maps)", link_maps, type="primary", use_container_width=True)
+                    with c_btn2:
+                        if st.button(f"{Icons.MAPA} Ver Mapa Visual", type="secondary", use_container_width=True):
+                            st.session_state.mostrar_mapa_rota = True
+            else:
+                st.info(f"{Icons.POINT_LEFT} Configure sua viagem no menu à esquerda e clique em **Gerar Roteiro**.")
+
+        # ==========================================================
+        # O SEGREDO DO DASHBOARD: O MAPA VEM AQUI EMBAIXO, FULL WIDTH!
+        # ==========================================================
+        if st.session_state.rota_gerada and st.session_state.mostrar_mapa_rota:
+            st.markdown("---")
+            st.markdown(f"### {Icons.MAPA} Visão Geográfica da Rota")
             
-            cnaes_selecionados = [mapa_cnaes[c] for c in cnaes_selecionados_visuais if c in mapa_cnaes]
-
-            st.write("")  # espaçamento
-            
-            submit = st.button("🧭 Gerar roteiro", type="primary", use_container_width=True)
-
-    # inicializa flag rota_gerada se necessário
-    if 'rota_gerada' not in st.session_state:
-        st.session_state.rota_gerada = False
-
-    # Ao submeter, atualiza flag
-    if submit:
-        if not cidades_selecionadas:
-            st.info("👈 Selecione as cidades e clique em 'Gerar Roteiro'.")
-            st.session_state.rota_gerada = False
-        else:
-            st.session_state.rota_gerada = True
-
-    # mostra resultados e ações apenas se rota_gerada for True
-    if st.session_state.rota_gerada:
-        with st.spinner("Buscando empresas na base de dados..."):
-            df_rota = buscar_leads_por_cidade_e_cnae(cidades_selecionadas, cnaes_selecionados)
-
-        if df_rota.empty:
-            st.warning("Nenhum cliente encontrado com esse perfil nas cidades selecionadas.")
-        else:
-            qtd_leads = len(df_rota)
-            # armazena mensagem para exibir acima dos resultados na coluna direita
-            result_message = f"🎯 Encontramos **{qtd_leads} oportunidades** ao longo desta rota!"
-            
-            # Prepara variáveis de origem/Google Maps; ação (botão + mapa) será exibida abaixo dos resultados
-            if cidade_partida:
-                origem_maps = f"{cidade_partida}, BA"
-                link_maps = gerar_link_google_maps(origem_maps, df_rota)
-
-            # resultados na coluna direita
-            with inner_right:
-                # mostra mensagem de resultados acima da lista
-                st.markdown(result_message)
-                st.markdown("### 📋 Clientes para Visitar:")
-                col_cidade = 'municipio' if 'municipio' in df_rota.columns else 'cidade'
-
-                for cidade in cidades_selecionadas:
-                    df_cidade = df_rota[df_rota[col_cidade] == cidade]
-
-                    if not df_cidade.empty:
-                        with st.expander(f"📍 Parada: {cidade} ({len(df_cidade)} clientes)", expanded=True):
-                            colunas_ideais = ['nome_fantasia', 'telefone', 'logradouro', 'numero', 'cnae']
-                            colunas_exibir = [c for c in colunas_ideais if c in df_cidade.columns]
-                            st.dataframe(
-                                df_cidade[colunas_exibir],
-                                use_container_width=True,
-                                hide_index=True
-                            )
-        # --- AÇÕES: Google Maps + Gerar Mapa Interno (botão) ---
-        # removido divisor para manter layout contínuo; botões ficam na coluna direita
-        if cidade_partida:
-            # botão Google Maps (mantém comportamento e texto)
-            inner_right.link_button("🚗 Abrir Rota no Google Maps (Celular)", link_maps, type="primary")
-
-        # inicializa flag de sessão se necessário
-        if 'mostrar_mapa_rota' not in st.session_state:
-            st.session_state.mostrar_mapa_rota = False
-        
-        if inner_right.button("🗺️ Gerar mapa da rota", type="secondary"):
-            st.session_state.mostrar_mapa_rota = True
-
-        if st.session_state.mostrar_mapa_rota:
-            # --- Renderiza mapa interno com marcadores e rota (Plotly ou Leaflet fallback) ---
-            # 1) Geocodifica origem e cidades (usa cache)
             origem_coord = geocode_place(origem_maps) if cidade_partida else None
             cidade_coords = []
             cidades_nao_geo = []
-            for cid in cidades_selecionadas:
-                coord = geocode_place(f"{cid}, BA")
-                if coord:
-                    cidade_coords.append((cid, coord))
-                else:
-                    cidades_nao_geo.append(cid)
+            
+            with st.spinner("Desenhando mapa panorâmico..."):
+                for cid in cidades_selecionadas:
+                    coord = geocode_place(f"{cid}, BA")
+                    if coord: cidade_coords.append((cid, coord))
+                    else: cidades_nao_geo.append(cid)
 
-                if cidades_nao_geo:
-                    container.warning(f"⚠️ Não foi possível geocodificar: {', '.join(cidades_nao_geo)}. Desenhando o que for possível.")
+            if cidades_nao_geo:
+                st.warning(f"{Icons.WARNING} Não foi possível localizar: {', '.join(cidades_nao_geo)}")
 
-            # Prepara lista de pontos para rota (lat, lon)
             points = []
-            if origem_coord:
-                points.append(origem_coord)
-            for _cid, coord in cidade_coords:
-                points.append(coord)
+            if origem_coord: points.append(origem_coord)
+            for _, coord in cidade_coords: points.append(coord)
 
-            route_geom = None
-            if len(points) >= 2:
-                route_geom = get_osrm_route(points)
+            route_geom = get_osrm_route(points) if len(points) >= 2 else None
+            if route_geom is None and points: route_geom = points
 
-            # Se falhou o OSRM, cria linha direta entre pontos
-            if route_geom is None and points:
-                route_geom = points
-
-            # (Full-screen HTML removed per user request)
-
-            # Renderiza com Plotly se disponível
             try:
                 import plotly.graph_objects as go
                 lats = [p[0] for p in route_geom] if route_geom else []
                 lons = [p[1] for p in route_geom] if route_geom else []
 
                 fig = go.Figure()
+                
                 if route_geom and len(route_geom) >= 2:
                     fig.add_trace(go.Scattermapbox(
-                        lat=lats,
-                        lon=lons,
-                        mode='lines',
-                        line=dict(width=4, color='blue'),
-                        name='Rota'
+                        lat=lats, lon=lons, mode='lines',
+                        line=dict(width=4, color='blue'), name='Trajeto'
                     ))
 
-                # Marcadores: origem (diferente ícone) e paradas
-                marker_lats = []
-                marker_lons = []
-                marker_texts = []
+                marker_lats, marker_lons, marker_texts = [], [], []
                 if origem_coord:
                     marker_lats.append(origem_coord[0])
                     marker_lons.append(origem_coord[1])
                     marker_texts.append("Origem")
+                
                 for cid, coord in cidade_coords:
                     marker_lats.append(coord[0])
                     marker_lons.append(coord[1])
                     marker_texts.append(cid)
 
                 if marker_lats:
+                    colors = ['green'] + ['red'] * (len(marker_lats)-1) if len(marker_lats) > 1 else ['green']
                     fig.add_trace(go.Scattermapbox(
-                        lat=marker_lats,
-                        lon=marker_lons,
-                        mode='markers+text',
-                        text=marker_texts,
-                        textposition="top right",
-                        marker=dict(size=10, color=['green'] + ['red'] * (len(marker_lats)-1) if len(marker_lats) > 1 else ['green']),
-                        name='Pontos'
+                        lat=marker_lats, lon=marker_lons, mode='markers+text',
+                        text=marker_texts, textposition="top right",
+                        marker=dict(size=12, color=colors), name='Paradas'
                     ))
 
-                # Centraliza mapa
-                center_lat = marker_lats[0] if marker_lats else (lats[0] if lats else 0)
-                center_lon = marker_lons[0] if marker_lons else (lons[0] if lons else 0)
+                center_lat = marker_lats[0] if marker_lats else (lats[0] if lats else -12.97)
+                center_lon = marker_lons[0] if marker_lons else (lons[0] if lons else -38.50)
+
                 fig.update_layout(
-                    mapbox_style="open-street-map",
-                    mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=8),
+                    mapbox_style="carto-positron", # Estilo mais limpo de Dashboard
+                    mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=7),
                     margin=dict(l=0, r=0, t=0, b=0),
-                    height=900
+                    height=600 # Altura ideal para mapa de tela cheia
                 )
-                inner_right.plotly_chart(fig, use_container_width=True)
-                # botão de abrir em tela cheia removido
+                
+                # Renderiza ocupando a largura total (use_container_width=True)
+                st.plotly_chart(fig, use_container_width=True)
+
             except Exception:
-                # Fallback: Leaflet embed via HTML if plotly não disponível
+                # Fallback Leaflet adaptado para 100% da largura
                 try:
                     import streamlit.components.v1 as components
                     markers = []
-                    if origem_coord:
-                        markers.append({"lat": origem_coord[0], "lon": origem_coord[1], "label": "Origem"})
-                    for cid, coord in cidade_coords:
-                        markers.append({"lat": coord[0], "lon": coord[1], "label": cid})
+                    if origem_coord: markers.append({"lat": origem_coord[0], "lon": origem_coord[1], "label": "Origem"})
+                    for cid, coord in cidade_coords: markers.append({"lat": coord[0], "lon": coord[1], "label": cid})
 
                     poly_pts = [[p[0], p[1]] for p in route_geom] if route_geom else []
+                    
                     leaflet_html = f"""
                     <!DOCTYPE html>
                     <html>
@@ -420,29 +386,26 @@ def render_tab_rota():
                       <meta name="viewport" content="width=device-width, initial-scale=1.0">
                       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
                       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-                      <style>#map{{height:80vh}}</style>
+                      <style>body{{margin:0;padding:0;}} #map{{height:600px; width:100%;}}</style>
                     </head>
                     <body>
                       <div id="map"></div>
                       <script>
-                        const map = L.map('map').setView([{markers[0]['lat'] if markers else  -14.2350}, {markers[0]['lon'] if markers else -51.9253}], 7);
-                        L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-                          maxZoom: 19,
+                        const map = L.map('map').setView([{markers[0]['lat'] if markers else -12.97}, {markers[0]['lon'] if markers else -38.50}], 7);
+                        L.tileLayer('https://{{s}}.basemaps.cartocdn.com/light_all/{{z}}/{{x}}/{{y}}{{r}}.png', {{
                           attribution: '© OpenStreetMap'
                         }}).addTo(map);
                         const markers = {json.dumps(markers)};
-                        markers.forEach(m => {{
-                          L.marker([m.lat, m.lon]).addTo(map).bindPopup(m.label);
-                        }});
+                        markers.forEach(m => {{ L.marker([m.lat, m.lon]).addTo(map).bindPopup(m.label); }});
                         const poly = {json.dumps(poly_pts)};
                         if(poly && poly.length > 0) {{
-                           L.polyline(poly, {{color:'blue'}}).addTo(map);
+                           L.polyline(poly, {{color:'blue', weight: 4}}).addTo(map);
                            map.fitBounds(L.polyline(poly).getBounds(), {{padding:[20,20]}})
                         }}
                       </script>
                     </body>
                     </html>
                     """
-                    components.html(leaflet_html, height=900)
+                    components.html(leaflet_html, height=600)
                 except Exception:
-                    center_col.info("Mapa interno não pôde ser carregado (Plotly/Leaflet indisponíveis).")
+                    st.info("Mapa indisponível no momento.")

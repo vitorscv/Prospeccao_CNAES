@@ -82,7 +82,7 @@ aba1, aba2, aba3, aba4, aba5 = st.tabs([
     Icons.ABA_PROSPECT + " Gerar Leads", 
     Icons.ABA_CRM + " Meu Pipeline",
     Icons.ABA_DASH + " Dashboard",
-    "Rota",
+    Icons.MAPA + " Rota",
 ])
 
 # ABA 1: DESCOBRIR CNAE 

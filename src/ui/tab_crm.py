@@ -1,4 +1,5 @@
 import streamlit as st
+from src.ui.icons import Icons
 from src.database.crm_repository import buscar_meu_pipeline, atualizar_lead_crm, excluir_do_crm, atualizar_leads_em_lote, excluir_leads_em_lote
 
 def render_tab_crm():
@@ -6,14 +7,14 @@ def render_tab_crm():
     Função que desenha a tela do CRM (Tabela Editável).
     OTIMIZADO: Usa cache em session_state para evitar buscas repetidas.
     """
-    st.header("💼 Carteira de Clientes")
+    st.header(f"{Icons.BRIEFCASE} Carteira de Clientes")
     
     
     col_header, col_refresh = st.columns([4, 1])
     with col_header:
         st.caption("Gerencie seus leads importados. Edite status e valores direto na tabela.")
     with col_refresh:
-        if st.button("🔄 Atualizar", width='stretch'):
+        if st.button(f"{Icons.REFRESH} Atualizar", width='stretch'):
             
             if 'df_pipeline_cache' in st.session_state:
                 del st.session_state.df_pipeline_cache
@@ -58,19 +59,19 @@ def render_tab_crm():
     
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("📊 Total de Leads", total)
-    c2.metric("💰 Potencial Total", f"R$ {valor_total:,.2f}")
-    c3.metric("✅ Vendas Realizadas", vendas, help="Leads com status 'Vendido'")
-    c4.metric("💵 Valor em Vendas", f"R$ {valor_vendas:,.2f}", help="Soma dos valores vendidos")
+    c1.metric(f"{Icons.CHART} Total de Leads", total)
+    c2.metric(f"{Icons.MONEY_BAG} Potencial Total", f"R$ {valor_total:,.2f}")
+    c3.metric(f"{Icons.CHECK} Vendas Realizadas", vendas, help="Leads com status 'Vendido'")
+    c4.metric(f"{Icons.MONEY} Valor em Vendas", f"R$ {valor_vendas:,.2f}", help="Soma dos valores vendidos")
     
     
     st.divider()
     c5, c6, c7, c8 = st.columns(4)
-    c5.metric("🤝 Em Negociação", em_negociacao)
-    c6.metric("💼 Valor Negociação", f"R$ {valor_negociacao:,.2f}")
+    c5.metric(f"{Icons.HANDSHAKE} Em Negociação", em_negociacao)
+    c6.metric(f"{Icons.BRIEFCASE} Valor Negociação", f"R$ {valor_negociacao:,.2f}")
     taxa_conversao = (vendas / total * 100) if total > 0 else 0
-    c7.metric("📈 Taxa Conversão", f"{taxa_conversao:.1f}%", help="Vendas / Total de Leads")
-    c8.metric("🎯 Novos Leads", len(df_pipeline[df_pipeline['status'] == 'Novo']))
+    c7.metric(f"{Icons.CHART_UP} Taxa Conversão", f"{taxa_conversao:.1f}%", help="Vendas / Total de Leads")
+    c8.metric(f"{Icons.LOGO_PAGINA} Novos Leads", len(df_pipeline[df_pipeline['status'] == 'Novo']))
     
     st.divider()
 
@@ -102,7 +103,7 @@ def render_tab_crm():
     )
 
    
-    if st.button("💾 SALVAR ALTERAÇÕES", type="primary", width='stretch'):
+    if st.button(f"{Icons.SAVE_EMOJI} SALVAR ALTERAÇÕES", type="primary", width='stretch'):
         alteracoes = 0
         cnpjs_excluir = []
         updates_lote = []
@@ -130,9 +131,9 @@ def render_tab_crm():
         
         if updates_lote:
             if atualizar_leads_em_lote(updates_lote):
-                st.success(f"✅ {alteracoes} alterações salvas com sucesso!")
+                st.success(f"{Icons.CHECK} {alteracoes} alterações salvas com sucesso!")
             else:
-                st.error("❌ Erro ao salvar algumas alterações. Tente novamente.")
+                st.error(f"{Icons.CROSS} Erro ao salvar algumas alterações. Tente novamente.")
         
         if alteracoes > 0:
             
