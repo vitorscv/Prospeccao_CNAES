@@ -13,7 +13,7 @@ try:
 except ImportError:
     BANCO_CONECTADO = False
 
-# --- Auxiliares: Geocoding (Nominatim) e Roteamento (OSRM) ---
+
 import json
 
 try:
@@ -56,7 +56,7 @@ def get_osrm_route(coords):
     """
     if not coords or len(coords) < 2:
         return None
-    # OSRM espera lon,lat pairs
+    
     coord_str = ";".join([f"{lon},{lat}" for lat, lon in coords])
     url = f"https://router.project-osrm.org/route/v1/driving/{coord_str}"
     params = {"overview": "full", "geometries": "geojson"}
@@ -68,9 +68,9 @@ def get_osrm_route(coords):
                 routes = data.get("routes")
                 if routes:
                     geom = routes[0].get("geometry", {}).get("coordinates", [])
-                    # geom is list of [lon, lat]
+
                     return [(lat, lon) for lon, lat in geom]
-        # Fallback minimal usando urllib
+
         from urllib import parse, request
         full_url = url + "?" + parse.urlencode(params)
         req = request.Request(full_url, headers={"User-Agent": "HunterLeads/1.0"})
@@ -96,45 +96,35 @@ def _higienizar_endereco(row) -> str:
     cid = str(row.get('municipio', '')).strip().title()
     uf = str(row.get('uf', '')).strip().upper() # Pega a UF exata do banco
 
-    # 2. Lista de "Sujeira" para remover
     lixo_numeros = ['Sn', 'S/N', 'Sem Numero', 'Nan', 'None', '0', '00', '999', '111', '.', '-']
     termos_rurais = ['Zona Rural', 'Pov', 'Povoado', 'Fazenda', 'Sitio', 'Estrada', 'Rodovia']
 
-    # Limpa Rua e Bairro se forem apenas pontos ou traços
+
     if rua in ['.', '-', '']: rua = ""
     if bairro in ['.', '-', '']: bairro = ""
 
-    # Limpa Número inválido
     if num.title() in lixo_numeros:
         num = ""
     
-    # Se a rua for "Zona Rural" ou "Rodovia", remove o número para o Google achar pelo menos a área
     if any(t in rua for t in termos_rurais):
         num = ""
 
-    # 3. Montagem Inteligente (Fallback)
     partes = []
 
-    # Se não tem rua (comum em cidade pequena), tenta usar o Bairro como referência
     if not rua and bairro:
         partes.append(bairro)
     elif rua:
         partes.append(rua)
         if num: partes.append(num)
     
-    # Adiciona a Cidade e UF
     if cid:
-        # SE tiver UF válida (2 letras), usa. SE NÃO, manda só a cidade.
-        # ISSO CORRIGE O ERRO "TRINDADE - BA" (quando é PE)
         if len(uf) == 2:
             partes.append(f"{cid} - {uf}")
         else:
             partes.append(cid) 
 
-    # Junta tudo
     endereco_limpo = ", ".join(partes)
     
-    # Só retorna se o endereço for minimamente útil (mais de 5 letras)
     return endereco_limpo if len(endereco_limpo) > 5 else None
 
 
@@ -147,7 +137,6 @@ def gerar_link_google_maps(origem: str, leads_df: pd.DataFrame) -> str:
         
     enderecos_validos = []
     
-    # Aplica a higienização linha a linha
     for _, row in leads_df.iterrows():
         end = _higienizar_endereco(row)
         if end:
@@ -156,15 +145,12 @@ def gerar_link_google_maps(origem: str, leads_df: pd.DataFrame) -> str:
     if not enderecos_validos:
         return "#"
 
-    # Definição de rota
-    destino = enderecos_validos[-1]      # Último cliente = Destino Final
-    waypoints = enderecos_validos[:-1]   # Outros = Paradas
+    destino = enderecos_validos[-1]      
+    waypoints = enderecos_validos[:-1]   
 
-    # Limite de segurança da URL (aprox 9 paradas)
     if len(waypoints) > 9:
         waypoints = waypoints[:9]
 
-    # URL Oficial de Navegação Universal (Funciona melhor que a antiga)
     base_url = "https://www.google.com/maps/dir/?api=1"
     
     params = f"&destination={quote_plus(destino)}"
@@ -184,7 +170,7 @@ def gerar_link_google_maps(origem: str, leads_df: pd.DataFrame) -> str:
     if len(meio_caminho) > 9:
         meio_caminho = meio_caminho[:9]
 
-    # Usando a API oficial de Direções do Google Maps  
+    # API oficial Google Maps  
     url = f"https://www.google.com/maps/dir/?api=1&origin={quote_plus(origem)}&destination={quote_plus(destino)}"
     
     if meio_caminho:
@@ -204,71 +190,71 @@ def render_tab_rota():
         st.error("🚨 Erro: Conexão com o banco de dados não encontrada.")
         return
 
-    # layout: form on left, resultados on right (inside main container)
+    # layout centralizado: colunas externas atuam como espaçadores e coluna central contém form + resultados
     container = st.container()
-    col_left, col_right = container.columns([1.05, 1.25], gap="large")
-    # form dentro da coluna esquerda
-    with col_left:
-        form = st.form("form_rota", clear_on_submit=False)
-        with form:
-            col1, col2 = st.columns([1, 2])
+    spacer_left, center_col, spacer_right = container.columns([0.05, 0.9, 0.05])
+    inner_left, inner_right = center_col.columns([0.35, 0.65], gap="large")
+    # form dentro da coluna esquerda (usando container para evitar a borda do st.form)
+    with inner_left:
+        form_container = st.container()
+        with form_container:
 
             cidades_selecionadas = []
             cnaes_selecionados = []
             cidade_partida = ""
 
-            with col1:
-                st.subheader("1. Ponto de Partida")
-                
-                todas_cidades = listar_cidades_disponiveis()
-                if not todas_cidades:
-                    todas_cidades = []
-                    
-                idx_padrao = todas_cidades.index("FEIRA DE SANTANA") if "FEIRA DE SANTANA" in todas_cidades else 0 if todas_cidades else None
-                
-                cidade_partida = st.selectbox(
-                    "📍 De qual cidade o vendedor vai sair?", 
-                    options=todas_cidades,
-                    index=idx_padrao
-                )
-
-                st.divider()
-
-                st.subheader("2. Destinos da Viagem")
-                cidades_selecionadas = st.multiselect(
-                    "Selecione as cidades da rota (em ordem de parada):",
-                    options=todas_cidades,
-                    placeholder="Ex: Santa Bárbara, Serrinha..."
-                )
-
-                st.subheader("3. Oportunidades Alvo")
-                
-                df_cnaes = listar_cnaes_disponiveis(limite=5000)
-                cnae_opcoes = []
-                mapa_cnaes = {} 
-                
-                if isinstance(df_cnaes, pd.DataFrame) and not df_cnaes.empty:
-                    for _, row in df_cnaes.iterrows():
-                        cod = str(row.get('codigo', '')).strip()
-                        desc = str(row.get('descricao', '')).strip()
-                        
-                        if cod:
-                            texto_exibicao = cod 
-                            cnae_opcoes.append(texto_exibicao)
-                            mapa_cnaes[texto_exibicao] = desc 
+            st.subheader("1. Ponto de Partida")
             
-                cnaes_selecionados_visuais = st.multiselect(
-                    "Quais códigos visitar?",
-                    options=cnae_opcoes,
-                    placeholder="Ex: 2392 (Use pontuação se precisar)"
-                )
+            todas_cidades = listar_cidades_disponiveis()
+            if not todas_cidades:
+                todas_cidades = []
                 
-                cnaes_selecionados = [mapa_cnaes[c] for c in cnaes_selecionados_visuais if c in mapa_cnaes]
+            idx_padrao = todas_cidades.index("FEIRA DE SANTANA") if "FEIRA DE SANTANA" in todas_cidades else 0 if todas_cidades else None
+            
+            cidade_partida = st.selectbox(
+                "📍 De qual cidade o vendedor vai sair?", 
+                options=todas_cidades,
+                index=idx_padrao
+            )
 
-            with col2:
-                if not cidades_selecionadas:
-                    st.info("👈 Selecione as cidades e clique em 'Gerar Roteiro'.")
-                submit = st.form_submit_button("🧭 Gerar roteiro", type="primary")
+            st.write("")  # espaçamento
+
+            st.subheader("2. Destinos da Viagem")
+            cidades_selecionadas = st.multiselect(
+                "Selecione as cidades da rota (em ordem de parada):",
+                options=todas_cidades,
+                placeholder="Ex: Santa Bárbara, Serrinha..."
+            )
+
+            st.write("")  # espaçamento
+
+            st.subheader("3. Oportunidades Alvo")
+            
+            df_cnaes = listar_cnaes_disponiveis(limite=5000)
+            cnae_opcoes = []
+            mapa_cnaes = {} 
+            
+            if isinstance(df_cnaes, pd.DataFrame) and not df_cnaes.empty:
+                for _, row in df_cnaes.iterrows():
+                    cod = str(row.get('codigo', '')).strip()
+                    desc = str(row.get('descricao', '')).strip()
+                    
+                    if cod:
+                        texto_exibicao = cod 
+                        cnae_opcoes.append(texto_exibicao)
+                        mapa_cnaes[texto_exibicao] = desc 
+        
+            cnaes_selecionados_visuais = st.multiselect(
+                "Quais códigos visitar?",
+                options=cnae_opcoes,
+                placeholder="Ex: 2392 (Use pontuação se precisar)"
+            )
+            
+            cnaes_selecionados = [mapa_cnaes[c] for c in cnaes_selecionados_visuais if c in mapa_cnaes]
+
+            st.write("")  # espaçamento
+            
+            submit = st.button("🧭 Gerar roteiro", type="primary", use_container_width=True)
 
     # inicializa flag rota_gerada se necessário
     if 'rota_gerada' not in st.session_state:
@@ -291,7 +277,8 @@ def render_tab_rota():
             st.warning("Nenhum cliente encontrado com esse perfil nas cidades selecionadas.")
         else:
             qtd_leads = len(df_rota)
-            container.success(f"🎯 Encontramos **{qtd_leads} oportunidades** ao longo desta rota!")
+            # armazena mensagem para exibir acima dos resultados na coluna direita
+            result_message = f"🎯 Encontramos **{qtd_leads} oportunidades** ao longo desta rota!"
             
             # Prepara variáveis de origem/Google Maps; ação (botão + mapa) será exibida abaixo dos resultados
             if cidade_partida:
@@ -299,7 +286,9 @@ def render_tab_rota():
                 link_maps = gerar_link_google_maps(origem_maps, df_rota)
 
             # resultados na coluna direita
-            with col_right:
+            with inner_right:
+                # mostra mensagem de resultados acima da lista
+                st.markdown(result_message)
                 st.markdown("### 📋 Clientes para Visitar:")
                 col_cidade = 'municipio' if 'municipio' in df_rota.columns else 'cidade'
 
@@ -316,16 +305,16 @@ def render_tab_rota():
                                 hide_index=True
                             )
         # --- AÇÕES: Google Maps + Gerar Mapa Interno (botão) ---
-        container.divider()
+        # removido divisor para manter layout contínuo; botões ficam na coluna direita
         if cidade_partida:
             # botão Google Maps (mantém comportamento e texto)
-            container.link_button("🚗 Abrir Rota no Google Maps (Celular)", link_maps, type="primary")
+            inner_right.link_button("🚗 Abrir Rota no Google Maps (Celular)", link_maps, type="primary")
 
         # inicializa flag de sessão se necessário
         if 'mostrar_mapa_rota' not in st.session_state:
             st.session_state.mostrar_mapa_rota = False
-
-        if container.button("🗺️ Gerar mapa da rota", type="secondary"):
+        
+        if inner_right.button("🗺️ Gerar mapa da rota", type="secondary"):
             st.session_state.mostrar_mapa_rota = True
 
         if st.session_state.mostrar_mapa_rota:
@@ -358,6 +347,8 @@ def render_tab_rota():
             # Se falhou o OSRM, cria linha direta entre pontos
             if route_geom is None and points:
                 route_geom = points
+
+            # (Full-screen HTML removed per user request)
 
             # Renderiza com Plotly se disponível
             try:
@@ -406,9 +397,10 @@ def render_tab_rota():
                     mapbox_style="open-street-map",
                     mapbox=dict(center=dict(lat=center_lat, lon=center_lon), zoom=8),
                     margin=dict(l=0, r=0, t=0, b=0),
-                    height=450
+                    height=900
                 )
-                container.plotly_chart(fig, use_container_width=True)
+                inner_right.plotly_chart(fig, use_container_width=True)
+                # botão de abrir em tela cheia removido
             except Exception:
                 # Fallback: Leaflet embed via HTML if plotly não disponível
                 try:
@@ -428,7 +420,7 @@ def render_tab_rota():
                       <meta name="viewport" content="width=device-width, initial-scale=1.0">
                       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
                       <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-                      <style>#map{{height:450px}}</style>
+                      <style>#map{{height:80vh}}</style>
                     </head>
                     <body>
                       <div id="map"></div>
@@ -451,6 +443,6 @@ def render_tab_rota():
                     </body>
                     </html>
                     """
-                    components.html(leaflet_html, height=480)
+                    components.html(leaflet_html, height=900)
                 except Exception:
-                    container.info("Mapa interno não pôde ser carregado (Plotly/Leaflet indisponíveis).")
+                    center_col.info("Mapa interno não pôde ser carregado (Plotly/Leaflet indisponíveis).")
