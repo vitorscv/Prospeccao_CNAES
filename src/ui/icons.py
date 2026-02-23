@@ -22,7 +22,7 @@ class Icons:
     # Decoração
     LOGO_PAGINA = ":material/emoji_events:"
     CARREGANDO = ":material/hourglass_empty:"
-    # Extras usados pela UI (material icons)
+    # Extras usados pela UI
     MAPA = ":material/map:"
     ALARM = ":material/notification_important:"
     GEAR = ":material/settings:"

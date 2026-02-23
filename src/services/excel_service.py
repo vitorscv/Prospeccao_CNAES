@@ -22,7 +22,7 @@ def gerar_excel_de_dtos(lista_dtos: List[Any] | pd.DataFrame) -> bytes:
     """
     output = BytesIO()
     
-    # Aceita: pandas.DataFrame, lista de dicionários, lista de dataclasses/objetos
+    # Aceita pandas.DataFrame, lista de dicionários, lista de dataclasses/objetos
     if isinstance(lista_dtos, pd.DataFrame):
         df = lista_dtos.copy()
     else:
@@ -119,7 +119,7 @@ def gerar_excel_leads_enriquecidos(leads: List[Any]) -> bytes:
             'Link Google Maps': attr(lead, 'link_maps'),
         }
 
-        # Se for dict com score ou objeto com score, adiciona
+        
         score = attr(lead, 'score', None)
         if score is not None:
             linha['Score'] = score
@@ -175,7 +175,7 @@ def gerar_excel_roteiro(
     for dia_plan in route_plan.dias:
         for stop in dia_plan.stops:
             lead = stop.lead
-            # helper to get attr or dict key
+            
             def a(o, name, default=''):
                 if isinstance(o, dict):
                     return o.get(name, default) or default

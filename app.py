@@ -12,6 +12,7 @@ from src.database.crm_repository import adicionar_lista_ao_crm
 from src.services.excel_service import gerar_excel_de_dtos
 from src.ui.tab_crm import render_tab_crm
 from src.ui.tab_rota import render_tab_rota
+
 #  CONFIGURAÇÃO DA PÁGINA
 st.set_page_config(page_title="Hunter Leads", layout="wide", page_icon=Icons.LOGO_PAGINA)
 
@@ -216,7 +217,7 @@ with aba3:
 
 # ABA 5: ROTA / PLANEJAMENTO
 with aba5:
-    # A aba de rota agora busca seus próprios dados do banco; chamada sem argumentos.
+    # A aba de rota agora busca seus próprios dados do banco
     render_tab_rota()
 
 # ABA 4: DASHBOARD

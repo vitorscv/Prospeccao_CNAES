@@ -3,7 +3,7 @@ import pandas as pd
 from urllib.parse import quote_plus
 from src.ui.icons import Icons
 
-# CONEXÃO COM O BANCO DE DADOS
+# CONEXÃO BANCO DE DADOS
 try:
     from src.database.repository import (
         buscar_leads_por_cidade_e_cnae,
@@ -90,7 +90,7 @@ def _higienizar_endereco(row) -> str:
     Função auxiliar interna para limpar o endereço bruto da Receita.
     Remove 'SN', '999', resolve Zona Rural e respeita a UF do banco.
     """
-    # 1. Extração e Formatação Básica
+    # Extração e Formatação
     rua = str(row.get('logradouro', '')).strip().title()
     num = str(row.get('numero', '')).strip()
     bairro = str(row.get('bairro', '')).strip().title()
@@ -191,15 +191,15 @@ def render_tab_rota():
         st.error(f"{Icons.ALARM} Erro: Conexão com o banco de dados não encontrada.")
         return
 
-    # Usamos 98% da tela para um visual mais imersivo tipo Dashboard
+    
     container = st.container()
     spacer_left, center_col, spacer_right = container.columns([0.01, 0.98, 0.01])
     
     with center_col:
-        # Divide a parte superior em: Filtros (30%) e Resultados (70%)
+        
         inner_left, inner_right = st.columns([0.6, 0.7], gap="large")
         
-        # --- COLUNA ESQUERDA: CONFIGURAÇÃO ---
+        # COLUNA ESQUERDA CONFIGURAÇÃO
         with inner_left:
             with st.container(border=True):
                 st.markdown(f"#### {Icons.GEAR} Configurar Viagem")
@@ -255,7 +255,7 @@ def render_tab_rota():
                 st.session_state.mostrar_mapa_rota = False # Reseta o mapa ao fazer nova busca
 
         origem_maps = ""
-        # --- COLUNA DIREITA: RESULTADOS ---
+        # COLUNA DIREITA RESULTADOS
         with inner_right:
             if st.session_state.rota_gerada:
                 with st.spinner("Analisando rota e buscando leads..."):
@@ -285,7 +285,7 @@ def render_tab_rota():
                     
                     st.divider()
 
-                    # Botões de Ação na Direita
+                    # Botões na Direita
                     c_btn1, c_btn2 = st.columns(2)
                     with c_btn1:
                         if cidade_partida:
@@ -296,9 +296,7 @@ def render_tab_rota():
             else:
                 st.info(f"{Icons.POINT_LEFT} Configure sua viagem no menu à esquerda e clique em **Gerar Roteiro**.")
 
-        # ==========================================================
-        # O SEGREDO DO DASHBOARD: O MAPA VEM AQUI EMBAIXO, FULL WIDTH!
-        # ==========================================================
+        
         if st.session_state.rota_gerada and st.session_state.mostrar_mapa_rota:
             st.markdown("---")
             st.markdown(f"### {Icons.MAPA} Visão Geográfica da Rota")
@@ -364,12 +362,11 @@ def render_tab_rota():
                     margin=dict(l=0, r=0, t=0, b=0),
                     height=600 # Altura ideal para mapa de tela cheia
                 )
-                
-                # Renderiza ocupando a largura total (use_container_width=True)
+
                 st.plotly_chart(fig, use_container_width=True)
 
             except Exception:
-                # Fallback Leaflet adaptado para 100% da largura
+                # Fallback Leaflet
                 try:
                     import streamlit.components.v1 as components
                     markers = []

@@ -7,7 +7,7 @@ def get_connection():
     Configura read_only=False para permitir criar tabelas e salvar CRM.
     """
     try:
-        # Tenta conectar permitindo escrita
+        
         con = duckdb.connect("hunter_leads.db", read_only=False)
         return con
     except Exception as e:

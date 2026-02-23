@@ -10,9 +10,8 @@ from time import perf_counter
 from typing import List, Optional, Dict, Any
 
 from src.database.connection import get_connection
-# removed dependency on src.models.lead (Lead / Endereco)
 
-# Flag de debug controlada por env var (DEBUG_ROTA=1 para ativar)
+
 DEBUG_ROTA = os.getenv("DEBUG_ROTA", "0") == "1"
 
 
@@ -44,7 +43,7 @@ def buscar_leads_enriquecidos(
     try:
         t_conn = perf_counter() - t0
         
-        # Debug: contagens progressivas para diagnóstico
+        
         if DEBUG_ROTA:
             count_total = con.execute("SELECT COUNT(*) FROM estabelecimentos").fetchone()[0]
             print(f"[DEBUG_ROTA] Total em estabelecimentos: {count_total}")
@@ -59,49 +58,40 @@ def buscar_leads_enriquecidos(
                 ).fetchone()[0]
                 print(f"[DEBUG_ROTA] Total filtrado por UF={uf} + situacao='02': {count_uf_sit}")
         
-        # Monta placeholders para CNAEs (?, ?, ?)
+        
         placeholders_cnae = ", ".join(["?" for _ in lista_cnaes])
         
-        # Normaliza CNAEs: remove pontos e hífens para matching consistente
-        # (ex: "4711-3/02" -> "4711302", "47.11-3/02" -> "4711302")
         lista_cnaes_normalizada = [c.replace(".", "").replace("-", "").replace("/", "") for c in lista_cnaes]
         
-        # Inicia lista de parâmetros com CNAEs normalizados
         params: List[str | int] = list(lista_cnaes_normalizada)
         
-        # Comprimento padrão para códigos IBGE de municípios (7 dígitos)
         MUNICIPIO_CODE_LENGTH = 7
         
-        # Filtro de UF
         filtro_uf = ""
         if uf and uf != "BRASIL":
             filtro_uf = "AND e.uf = ?"
             params.append(uf)
         
-        # Filtro de cidade (precisa buscar código do município)
         filtro_cidade = ""
         if cidade and cidade != "TODAS":
-            # Busca código da cidade de forma segura (normaliza comparação)
             codigo_cidade = con.execute(
                 "SELECT codigo FROM municipios WHERE TRIM(UPPER(descricao)) = TRIM(UPPER(?)) LIMIT 1",
                 [cidade]
             ).fetchone()
             
             if codigo_cidade:
-                # Normaliza código do município para string com zeros à esquerda se necessário
                 codigo_str = str(codigo_cidade[0]).strip()
-                codigo_normalizado = codigo_str.zfill(MUNICIPIO_CODE_LENGTH)  # Normaliza parâmetro uma vez
-                # Usa coluna normalizada da CTE (municipio_norm) para melhor performance
+                codigo_normalizado = codigo_str.zfill(MUNICIPIO_CODE_LENGTH)
                 filtro_cidade = f"AND e.municipio_norm = ?"
                 params.append(codigo_normalizado)
                 
                 if DEBUG_ROTA:
-                    # Debug: distribuição de comprimentos
+                       
                     len_dist = con.execute(
                         "SELECT LENGTH(CAST(municipio AS VARCHAR)) as len, COUNT(*) as cnt FROM estabelecimentos WHERE uf = ? GROUP BY len ORDER BY len",
                         [uf]
                     ).fetchall()
-                    len_dict = {row[0]: row[1] for row in len_dist[:10]}  # primeiros 10 comprimentos
+                    len_dict = {row[0]: row[1] for row in len_dist[:10]}
                     print(f"[DEBUG_ROTA] Distribuição LENGTH(municipio) para UF={uf}: {len_dict}")
                     
                     count_municipio = con.execute(
@@ -110,15 +100,12 @@ def buscar_leads_enriquecidos(
                     ).fetchone()[0]
                     print(f"[DEBUG_ROTA] Total no JOIN municipios para cidade={cidade} (cod={codigo_str}): {count_municipio}")
         
-        # Filtro de matriz/filial
         filtro_matriz = ""
         if somente_matriz:
             filtro_matriz = "AND e.matriz_filial = ?"
-            params.append("1")  # 1 = Matriz
+            params.append("1")
         
-        # Debug: contagem antes da query principal
         if DEBUG_ROTA:
-            # Contagem com filtros aplicados (sem JOINs complexos)
             debug_query = f"""
                 SELECT COUNT(*) FROM estabelecimentos e
                 WHERE REPLACE(REPLACE(REPLACE(e.cnae_principal, '.', ''), '-', ''), '/', '') IN ({placeholders_cnae})
@@ -127,7 +114,7 @@ def buscar_leads_enriquecidos(
                 {filtro_cidade}
                 {filtro_matriz}
             """
-            debug_params = params[:-1] if limite in params else params  # remove limite se existir
+            debug_params = params[:-1] if limite in params else params
             try:
                 count_final = con.execute(debug_query, debug_params).fetchone()[0]
                 print(f"[DEBUG_ROTA] Total com todos os filtros (antes JOINs): {count_final}")
@@ -135,8 +122,6 @@ def buscar_leads_enriquecidos(
             except Exception as debug_e:
                 print(f"[DEBUG_ROTA] Erro na contagem debug: {debug_e}")
         
-        # Query principal otimizada: usa CTE para normalizar uma vez (evita recalcular REPLACE/LPAD por linha)
-        # Normaliza CNAE e município na CTE para melhor performance
         t_query_start = perf_counter()
         query = f"""
             WITH estabelecimentos_norm AS (
@@ -179,7 +164,6 @@ def buscar_leads_enriquecidos(
         
         params.append(limite)
         
-        # Executa query
         rows = con.execute(query, params).fetchall()
         t_query = perf_counter() - t_query_start
         
@@ -188,10 +172,8 @@ def buscar_leads_enriquecidos(
         
         con.close()
         
-        # Converte para objetos Lead
         leads: List[Lead] = []
         for row in rows:
-            # Monta endereço (índices ajustados após remover possível coluna inexistente)
             endereco = None
             if row[6]:  # logradouro
                 endereco = Endereco(
@@ -217,30 +199,27 @@ def buscar_leads_enriquecidos(
             data_inicio = None
             if row[18]:
                 try:
-                    # Formato esperado: YYYYMMDD ou YYYY-MM-DD
+                    
                     data_str = str(row[18])
                     if len(data_str) == 8:
-                        # YYYYMMDD
                         data_inicio = date(
                             int(data_str[0:4]),
                             int(data_str[4:6]),
                             int(data_str[6:8])
                         )
                     else:
-                        # Tenta parse direto
                         from datetime import datetime
                         data_inicio = datetime.fromisoformat(str(row[18])).date()
                 except (ValueError, TypeError):
                     pass
             
-            # Determina matriz/filial
             matriz_filial = "MATRIZ" if row[5] == "1" else "FILIAL"
             
             lead = Lead(
                 cnpj=row[0],
                 cnpj_basico=row[1],
                 nome_fantasia=row[2] or "",
-                razao_social=None,  # coluna não disponível no schema; mantém compatibilidade
+                razao_social=None,
                 cnae_principal=row[3],
                 descricao_cnae=row[4] or "",
                 matriz_filial=matriz_filial,
@@ -266,7 +245,6 @@ def buscar_leads_enriquecidos(
     except Exception as e:
         if con:
             con.close()
-        # Mensagem de erro mais informativa para debugging sem vazar dados sensíveis
         print(f"Erro ao buscar leads enriquecidos: {e} -- params_len={len(params) if 'params' in locals() else 'n/a'}")
         import traceback
         traceback.print_exc()
@@ -290,21 +268,18 @@ def dedupe_leads_por_cnpj_basico(leads: List[Lead]) -> List[Lead]:
     Returns:
         Lista de leads sem duplicatas
     """
-    # Agrupa por CNPJ básico
     grupos: dict[str, List[Lead]] = {}
     for lead in leads:
         if lead.cnpj_basico not in grupos:
             grupos[lead.cnpj_basico] = []
         grupos[lead.cnpj_basico].append(lead)
     
-    # Para cada grupo, escolhe o melhor
     leads_deduped: List[Lead] = []
     for cnpj_basico, grupo in grupos.items():
         if len(grupo) == 1:
             leads_deduped.append(grupo[0])
             continue
         
-        # Ordena por prioridade
         def score_lead(lead: Lead) -> tuple:
             return (
                 1 if lead.matriz_filial == "MATRIZ" else 0,
@@ -335,7 +310,6 @@ def buscar_cnae_por_texto_seguro(termo: str, limite: int = 15) -> List[tuple[str
         return []
     
     try:
-        # Query parametrizada com LIKE
         query = """
             SELECT codigo, descricao 
             FROM cnaes 
@@ -343,7 +317,6 @@ def buscar_cnae_por_texto_seguro(termo: str, limite: int = 15) -> List[tuple[str
             LIMIT ?
         """
         
-        # Adiciona % para busca parcial
         termo_like = f"%{termo}%"
         
         rows = con.execute(query, [termo_like, limite]).fetchall()

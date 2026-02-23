@@ -2,12 +2,12 @@ import streamlit as st
 from src.database.connection import get_connection
 from src.models.empresa_dto import EmpresaDTO
 
-#FUNCAO 1 BUSCAR EMPRESAS 
+# BUSCAR EMPRESAS DTO 
 def buscar_empresas_dto(lista_cnaes, estado, cidade="TODAS"):
     con = get_connection()
     if not con: return []
 
-    # 1. PREPARA OS FILTROS
+    # PREPARA FILTROS
     cnaes_sql = "', '".join(lista_cnaes)
     
     filtro_uf = "" if estado == "BRASIL" else f"AND uf = '{estado}'"
@@ -20,7 +20,7 @@ def buscar_empresas_dto(lista_cnaes, estado, cidade="TODAS"):
             if res: filtro_cidade = f"AND estabelecimentos.municipio = '{res[0]}'"
         except: pass
 
-    # 2. QUERY PRINCIPAL
+    # QUERY PRINCIPAL
     query = f"""
         SELECT 
             nome_fantasia,
@@ -40,7 +40,7 @@ def buscar_empresas_dto(lista_cnaes, estado, cidade="TODAS"):
         LIMIT 50000 
     """
     
-    # 3. CONVERSÃO PARA DTO
+    # CONVERSÃO PARA DTO
     rows = con.execute(query).fetchall()
     con.close()
 
@@ -60,7 +60,7 @@ def buscar_empresas_dto(lista_cnaes, estado, cidade="TODAS"):
         
     return lista_final 
 
-# FUNÇÃO 2: BUSCAR CNAE POR TEXTO 
+# BUSCAR CNAE POR TEXTO 
 def buscar_cnae_por_texto(termo):
     con = get_connection()
     if not con: return None
@@ -70,7 +70,7 @@ def buscar_cnae_por_texto(termo):
     con.close()
     return df
 
-# FUNÇÃO 3: LISTAR CIDADES
+# LISTAR CIDADES  
 @st.cache_data
 def listar_cidades_do_banco(uf_filtro="TODAS"):
     con = get_connection()
@@ -95,7 +95,7 @@ def listar_cidades_do_banco(uf_filtro="TODAS"):
     except:
         return []
 
-        # FUNÇÃO 4: DASHBOARD Top 10
+# DASHBOARD Top 10
 def buscar_top_cidades(lista_cnaes, estado):
     con = get_connection()
     if not con: return None
@@ -118,14 +118,14 @@ def buscar_top_cidades(lista_cnaes, estado):
             ORDER BY "Total" DESC
             LIMIT 10
         """
-        # Retorna direto um DataFrame pro gráfico usar
+        # Retornar DataFrame pro gráfico
         df = con.execute(query).df()
         con.close()
         return df
     except:
         return None
 
-# FUNÇÃO 5: ANÁLISE DETALHADA DE MERCADO
+# ANÁLISE DETALHADA DE MERCADO
 def analise_detalhada_mercado(lista_cnaes, estado):
     """Retorna múltiplas análises do mercado para insights avançados."""
     con = get_connection()
@@ -135,7 +135,7 @@ def analise_detalhada_mercado(lista_cnaes, estado):
     filtro_uf = "" if estado == "BRASIL" else f"AND uf = '{estado}'"
     
     try:
-        # 1. Distribuição por UF
+        # Distribuição por UF
         query_uf = f"""
             SELECT 
                 uf AS "UF",
@@ -149,7 +149,7 @@ def analise_detalhada_mercado(lista_cnaes, estado):
         """
         df_uf = con.execute(query_uf).df()
         
-        # 2. Distribuição por CNAE (quais atividades têm mais empresas)
+        # Distribuição por CNAE
         query_cnae = f"""
             SELECT 
                 c.descricao AS "Atividade",
@@ -165,7 +165,7 @@ def analise_detalhada_mercado(lista_cnaes, estado):
         """
         df_cnae = con.execute(query_cnae).df()
         
-        # 3. Empresas com contato (telefone ou email)
+        # Empresas com contato
         query_contato = f"""
             SELECT 
                 COUNT(*) AS total,
@@ -179,8 +179,8 @@ def analise_detalhada_mercado(lista_cnaes, estado):
             AND situacao_cadastral = '02'
         """
         df_contato = con.execute(query_contato).df()
-        
-        # 4. Top 20 cidades (mais detalhado)
+
+        # Top 20 cidades
         query_top20 = f"""
             SELECT 
                 m.descricao || '-' || e.uf AS "Cidade",
@@ -198,7 +198,7 @@ def analise_detalhada_mercado(lista_cnaes, estado):
         """
         df_top20 = con.execute(query_top20).df()
         
-        # 5. Estatísticas gerais
+        # Estatísticas gerais    
         query_stats = f"""
             SELECT 
                 COUNT(*) AS total_empresas,
@@ -225,28 +225,26 @@ def analise_detalhada_mercado(lista_cnaes, estado):
         print(f"Erro na análise detalhada: {e}")
         return {}
 
-# FUNÇÃO 6: ANÁLISE DO PIPELINE
+# ANÁLISE DO PIPELINE
 def analise_pipeline():
     """Retorna análises detalhadas do pipeline/CRM."""
     from src.database.connection import get_connection
     from src.database.crm_repository import inicializar_crm
     import pandas as pd
     
-    # Garante que a tabela CRM existe
+    
     inicializar_crm()
     
     con = get_connection()
     if not con: return {}
     
     try:
-        # Verifica se há dados no CRM
         count_check = con.execute("SELECT COUNT(*) as total FROM crm").fetchone()
         if not count_check or count_check[0] == 0:
             con.close()
             return {}
         
-        # 1. Distribuição por Status
-        # Normaliza status: remove espaços, torna maiúsculo e substitui NULL por 'Sem Status'
+        
         query_status = """
             SELECT 
                 UPPER(TRIM(COALESCE(status, 'Sem Status'))) AS "Status",
@@ -257,14 +255,13 @@ def analise_pipeline():
             ORDER BY "Quantidade" DESC
         """
         df_status = con.execute(query_status).df()
-        # DEBUG: mostra status brutos retornados pelo banco
         try:
             print("DEBUG - df_status head:")
             print(df_status.head())
         except Exception:
             pass
         
-        # 2. Evolução temporal (vendas por mês)
+        
         query_temporal = """
             SELECT 
                 strftime('%Y-%m', data_atualizacao) AS "Mês",
@@ -276,7 +273,6 @@ def analise_pipeline():
             GROUP BY strftime('%Y-%m', data_atualizacao)
             ORDER BY "Mês" DESC
         """
-        # Ajusta temporal para considerar variações no texto do status (case/acentos)
         query_temporal = """
             SELECT 
                 strftime('%Y-%m', data_atualizacao) AS "Mês",
@@ -290,7 +286,7 @@ def analise_pipeline():
         """
         df_temporal = con.execute(query_temporal).df()
         
-        # 3. Top 10 leads por valor
+        
         query_top_valor = """
             SELECT 
                 c.cnpj,
@@ -310,8 +306,7 @@ def analise_pipeline():
         except Exception:
             pass
         
-        # 4. Taxa de conversão por fase
-        # Conversão por fase usando status normalizado
+        
         query_conversao = """
             SELECT 
                 UPPER(TRIM(COALESCE(status, 'Sem Status'))) AS "Fase",
@@ -328,7 +323,7 @@ def analise_pipeline():
         except Exception:
             pass
         
-        # 5. Estatísticas gerais do pipeline
+        
         query_stats = """
             SELECT 
                 COUNT(*) AS total_leads,
@@ -340,7 +335,7 @@ def analise_pipeline():
                 AVG(CASE WHEN status = 'Vendido' THEN valor ELSE NULL END) AS ticket_medio
             FROM crm
         """
-        # Estatísticas com normalização por LIKE para evitar problemas de acento/case
+        
         query_stats = """
             SELECT 
                 COUNT(*) AS total_leads,
@@ -361,7 +356,6 @@ def analise_pipeline():
         
         con.close()
         
-        # Garante que todos os DataFrames existem (mesmo que vazios)
         if df_status is None:
             df_status = pd.DataFrame()
         if df_temporal is None:
@@ -388,7 +382,7 @@ def analise_pipeline():
         traceback.print_exc()
         return {}
 
-# FUNÇÃO 7: DADOS PARA DASHBOARD EXECUTIVO
+# DADOS PARA DASHBOARD
 def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lista_cnaes=None):
     """
     Busca dados agregados para o dashboard executivo.
@@ -425,7 +419,7 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
             cnaes_sql = "', '".join(lista_cnaes)
             filtro_cnae = f"AND cnae_principal IN ('{cnaes_sql}')"
         
-        # 1. KPIs: Total de empresas, cidades únicas, setor predominante
+        # KPIs Total de empresas, cidades únicas, setor predominante
         query_kpis = f"""
             SELECT 
                 COUNT(*) AS total_empresas,
@@ -440,7 +434,7 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
         """
         df_kpis = con.execute(query_kpis).df()
         
-        # Setor predominante (CNAE com mais empresas)
+        # Setor predominante
         query_setor = f"""
             SELECT 
                 c.descricao AS setor,
@@ -458,7 +452,7 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
         df_setor = con.execute(query_setor).df()
         setor_predominante = df_setor.iloc[0]['setor'] if not df_setor.empty else "N/A"
         
-        # 2. Dados para mapa: Empresas por cidade com UF
+        
         query_mapa = f"""
             SELECT 
                 m.descricao AS cidade,
@@ -479,7 +473,7 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
         """
         df_mapa = con.execute(query_mapa).df()
         
-        # 3. Top 10 Cidades
+        # Top 10 Cidades
         query_top10 = f"""
             SELECT 
                 m.descricao || ' - ' || e.uf AS cidade_uf,
@@ -497,7 +491,7 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
         """
         df_top10 = con.execute(query_top10).df()
         
-        # 4. Distribuição por CNAE/Setor
+        # Distribuição por CNAE/Setor
         query_cnae_dist = f"""
             SELECT 
                 c.descricao AS setor,
@@ -514,7 +508,7 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
         """
         df_cnae_dist = con.execute(query_cnae_dist).df()
         
-        # 5. Distribuição por Estado
+        # Distribuição por Estado
         query_uf_dist = f"""
             SELECT 
                 uf,
@@ -545,7 +539,7 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
         print(f"Erro ao buscar dados do dashboard: {e}")
         return {}
 
-# FUNÇÃO 8: LISTAR CNAES DISPONÍVEIS
+# LISTAR CNAES DISPONÍVEIS
 def listar_cnaes_disponiveis(termo_busca=None, limite=100):
     """Lista CNAEs disponíveis para filtro multiselect."""
     con = get_connection()
@@ -576,7 +570,7 @@ def listar_cnaes_disponiveis(termo_busca=None, limite=100):
         return pd.DataFrame()
 
 
-# NOVAS FUNÇÕES SOLICITADAS PELO TAB_ROTA.PY
+# LISTAR CIDADES DISPONÍVEIS
 def listar_cidades_disponiveis():
     """
     Retorna lista ordenada de cidades (descrição) disponíveis no banco.
@@ -608,7 +602,7 @@ def buscar_leads_por_cidade_e_cnae(cidades: list, cnaes: list):
         return pd.DataFrame()
 
     try:
-        # Filtra cidades: primeiro busca os códigos das cidades na tabela municipios
+        # Filtra cidades
         cidades_safe = [c.replace("'", "''") for c in cidades]
         codigos = []
         for cid in cidades_safe:
@@ -627,7 +621,6 @@ def buscar_leads_por_cidade_e_cnae(cidades: list, cnaes: list):
 
         filtro_cnae = ""
         if cnaes and len(cnaes) > 0:
-            # Assume que cnaes vem como descrições; buscamos os códigos correspondentes
             cnaes_safe = [c.replace("'", "''") for c in cnaes]
             cnaes_descr_sql = "', '".join(cnaes_safe)
             filtro_cnae = f"AND c.descricao IN ('{cnaes_descr_sql}')"

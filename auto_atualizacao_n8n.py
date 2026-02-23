@@ -12,7 +12,7 @@ WEBHOOK_N8N = "" # Coloque seu Link do n8n aqui
 arquivos_para_checar = [
     f"Estabelecimentos{i}.zip" for i in range(10) # Gera do 0 ao 9
 ]
-# ADD CNAES, SOCIOS,
+
 # arquivos_para_checar.append("Cnaes.zip")
 
 def obter_data_servidor(url):

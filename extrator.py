@@ -11,7 +11,7 @@ st.subheader("Filtre por CNAE, Estado e Cidade em tempo real")
 with st.sidebar:
     st.header("Configurações da Busca")
     
-    # Input de CNAEs (aceita vários separados por vírgula)
+    # Input de CNAEs
     cnaes_input = st.text_input("Lista de CNAEs (ex: 2391601, 6201501)", "2391601")
     lista_cnaes = [c.strip() for c in cnaes_input.split(',')]
     
@@ -49,7 +49,7 @@ if botao_buscar:
 
     if not df.empty:
         st.success(f"Encontramos {len(df)} empresas para esses critérios!")
-        st.dataframe(df) # Mostra a prévia na tela
+        st.dataframe(df) 
         
         # Botão para baixar o CSV formatado
         csv = df.to_csv(index=False).encode('utf-8')
