@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from src.database.connection import get_connection
 from src.models.empresa_dto import EmpresaDTO
 
