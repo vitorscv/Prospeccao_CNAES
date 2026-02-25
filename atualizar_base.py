@@ -13,17 +13,19 @@ ARQUIVOS_NECESSARIOS = ["CNAECNV.zip"] + [f"ESTABELE{i}.zip" for i in range(10)]
 
 
 def _listar_links_html(url: str) -> list[str]:
+
+    
     resp = requests.get(url, timeout=60)
     resp.raise_for_status()
     html = resp.text
-    # pega hrefs simples
+    
     return re.findall(r'href="([^"]+)"', html, flags=re.IGNORECASE)
 
 
 def descobrir_pasta_mais_recente() -> str:
     links = _listar_links_html(BASE_INDEX)
 
-    # Ex.: 2025-12/, 2026-01/, etc.
+    # Ex.: 2025-12, 2026-01
     pastas = []
     for link in links:
         m = re.match(r"(\d{4}-\d{2})/?$", link.strip("/"))
@@ -55,7 +57,7 @@ def atualizar_zips_receita() -> dict:
     periodo = descobrir_pasta_mais_recente()
     base_mes = urljoin(BASE_INDEX, f"{periodo}/")
 
-    # cria backup simples da pasta dados (opcional, mas útil)
+    # cria backup simples da pasta dados 
     backup_dir = Path("dados_backup")
     if backup_dir.exists():
         shutil.rmtree(backup_dir)
