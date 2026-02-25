@@ -222,7 +222,7 @@ with aba5:
 
 # ABA 4: DASHBOARD
 with aba4:
-    st.header(Icons.ABA_DASH + " Dashboard Executivo - Inteligência de Mercado")
+    st.header(Icons.ABA_DASH + " Dashboard - Inteligência de Mercado")
     st.caption("Análise estratégica de oportunidades e expansão territorial")
     st.info(Icons.INFO + " Use os filtros da barra lateral para personalizar a análise.")
     
