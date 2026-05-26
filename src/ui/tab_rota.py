@@ -167,21 +167,6 @@ def gerar_link_google_maps(origem: str, leads_df: pd.DataFrame) -> str:
 
     return base_url + params
 
-    # Limite do Google
-    if len(meio_caminho) > 9:
-        meio_caminho = meio_caminho[:9]
-
-    # API oficial Google Maps  
-    url = f"https://www.google.com/maps/dir/?api=1&origin={quote_plus(origem)}&destination={quote_plus(destino)}"
-    
-    if meio_caminho:
-        waypoints_str = "|".join([quote_plus(end) for end in meio_caminho])
-        url += f"&waypoints={waypoints_str}"
-        
-    url += "&travelmode=driving"
-
-    return url
-
 def render_tab_rota():
     """Renderiza a interface da aba de Rotas usando a base de dados."""
     

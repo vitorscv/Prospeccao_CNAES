@@ -3,6 +3,9 @@ import pandas as pd
 from src.database.connection import get_connection
 from src.models.empresa_dto import EmpresaDTO
 
+RESULTADOS_EMPRESAS_LIMITE = 50_000
+POPULATION_YEAR = 2025
+
 # BUSCAR EMPRESAS DTO 
 def buscar_empresas_dto(lista_cnaes, estado, cidade="TODAS"):
     con = get_connection()
@@ -38,7 +41,7 @@ def buscar_empresas_dto(lista_cnaes, estado, cidade="TODAS"):
         {filtro_uf}
         AND situacao_cadastral = '02'
         {filtro_cidade}
-        LIMIT 50000 
+        LIMIT {RESULTADOS_EMPRESAS_LIMITE}
     """
     
     # CONVERSÃO PARA DTO
@@ -61,15 +64,165 @@ def buscar_empresas_dto(lista_cnaes, estado, cidade="TODAS"):
         
     return lista_final 
 
-# BUSCAR CNAE POR TEXTO 
-def buscar_cnae_por_texto(termo):
+def _normalizar_sql(expr: str) -> str:
+    return (
+        "LOWER(TRANSLATE("
+        f"{expr}, "
+        "'áàâãäéèêëíìîïóòôõöúùûüçÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇ', "
+        "'aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC'"
+        "))"
+    )
+
+
+def _filtro_intervalos_cnae(intervalos: list[tuple[int, int]] | None) -> tuple[str, list[int]]:
+    if not intervalos:
+        return "TRUE", []
+
+    filtros = []
+    params = []
+    for raiz_inicio, raiz_fim in intervalos:
+        filtros.append("raiz BETWEEN ? AND ?")
+        params.extend([int(raiz_inicio), int(raiz_fim)])
+    return " OR ".join(filtros), params
+
+
+def buscar_cnaes_por_secao(intervalos: list[tuple[int, int]]):
     con = get_connection()
-    if not con: return None
-    
-    query = f"SELECT codigo, descricao FROM cnaes WHERE descricao ILIKE '%{termo}%' LIMIT 15"
-    df = con.execute(query).df()
+    if not con:
+        return pd.DataFrame(columns=["codigo", "descricao"])
+
+    filtro_intervalos, params = _filtro_intervalos_cnae(intervalos)
+
+    query = """
+        WITH cnaes_normalizados AS (
+            SELECT
+                codigo,
+                descricao,
+                TRY_CAST(
+                    SUBSTR(
+                        REPLACE(REPLACE(REPLACE(codigo, '.', ''), '-', ''), '/', ''),
+                        1,
+                        2
+                    ) AS INTEGER
+                ) AS raiz
+            FROM cnaes
+        )
+        SELECT codigo, descricao
+        FROM cnaes_normalizados
+        WHERE {filtros_raiz}
+        ORDER BY codigo
+    """.format(filtros_raiz=filtro_intervalos)
+    df = con.execute(query, params).df()
     con.close()
     return df
+
+
+def buscar_cnaes_flexivel(termo: str, intervalos: list[tuple[int, int]] | None = None, limite: int = 500):
+    con = get_connection()
+    if not con or not termo or not termo.strip():
+        return pd.DataFrame(columns=["codigo", "descricao"])
+
+    filtro_intervalos, params_intervalos = _filtro_intervalos_cnae(intervalos)
+    descricao_normalizada = _normalizar_sql("descricao")
+    termo_normalizado = _normalizar_sql("token")
+
+    query = """
+        WITH termos AS (
+            SELECT {termo_normalizado} AS termo
+            FROM UNNEST(regexp_split_to_array(?, '\\s+')) AS t(token)
+            WHERE LENGTH(TRIM(token)) >= 2
+        ),
+        cnaes_normalizados AS (
+            SELECT
+                codigo,
+                descricao,
+                {descricao_normalizada} AS descricao_busca,
+                TRY_CAST(
+                    SUBSTR(
+                        REPLACE(REPLACE(REPLACE(codigo, '.', ''), '-', ''), '/', ''),
+                        1,
+                        2
+                    ) AS INTEGER
+                ) AS raiz
+            FROM cnaes
+        )
+        SELECT codigo, descricao
+        FROM cnaes_normalizados c
+        WHERE ({filtros_raiz})
+          AND NOT EXISTS (
+              SELECT 1
+              FROM termos t
+              WHERE NOT (
+                  c.descricao_busca ILIKE '%' || t.termo || '%'
+                  OR (t.termo IN ('farmacia', 'farmacias') AND c.descricao_busca ILIKE '%farmac%')
+                  OR (t.termo IN ('roupa', 'roupas') AND (
+                      c.descricao_busca ILIKE '%roupa%' OR c.descricao_busca ILIKE '%vestuario%'
+                  ))
+              )
+          )
+        ORDER BY codigo
+        LIMIT ?
+    """.format(
+        termo_normalizado=termo_normalizado,
+        descricao_normalizada=descricao_normalizada,
+        filtros_raiz=filtro_intervalos,
+    )
+    df = con.execute(query, [termo.strip(), *params_intervalos, int(limite)]).df()
+    con.close()
+    return df
+
+
+def contar_empresas_por_cnae(lista_cnaes, estado="BRASIL", cidade="TODAS"):
+    con = get_connection()
+    if not con or not lista_cnaes:
+        return {}
+
+    try:
+        cnaes = [str(c).strip() for c in lista_cnaes if str(c).strip()]
+        if not cnaes:
+            con.close()
+            return {}
+
+        placeholders = ", ".join(["?" for _ in cnaes])
+        filtros = [
+            f"cnae_principal IN ({placeholders})",
+            "situacao_cadastral = '02'",
+        ]
+        params = list(cnaes)
+
+        if estado != "BRASIL":
+            filtros.append("uf = ?")
+            params.append(estado)
+
+        if cidade != "TODAS" and estado != "BRASIL":
+            res = con.execute(
+                "SELECT codigo FROM municipios WHERE descricao = ? LIMIT 1",
+                [cidade],
+            ).fetchone()
+            if not res:
+                con.close()
+                return {cnae: 0 for cnae in cnaes}
+
+            filtros.append("municipio = ?")
+            params.append(str(res[0]))
+
+        query = f"""
+            SELECT cnae_principal, COUNT(*) AS total
+            FROM estabelecimentos
+            WHERE {' AND '.join(filtros)}
+            GROUP BY cnae_principal
+        """
+
+        rows = con.execute(query, params).fetchall()
+        con.close()
+        totais = {str(cnae): int(total) for cnae, total in rows}
+        return {cnae: totais.get(cnae, 0) for cnae in cnaes}
+    except Exception:
+        try:
+            con.close()
+        except:
+            pass
+        return {str(cnae): 0 for cnae in lista_cnaes}
 
 # LISTAR CIDADES  
 @st.cache_data
@@ -393,6 +546,43 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
     if not con: return {}
     
     try:
+        tabelas = {
+            row[0]
+            for row in con.execute("SHOW TABLES").fetchall()
+        }
+        colunas_municipios = {
+            row[0]
+            for row in con.execute("DESCRIBE municipios").fetchall()
+        }
+        tem_populacao_municipios = "populacao" in colunas_municipios
+        tem_tabela_populacao = False
+        if "populacao_municipios" in tabelas:
+            colunas_populacao = {
+                row[0]
+                for row in con.execute("DESCRIBE populacao_municipios").fetchall()
+            }
+            tem_tabela_populacao = {"id_municipio", "ano", "populacao"}.issubset(colunas_populacao)
+
+        tem_populacao = tem_tabela_populacao or tem_populacao_municipios
+        if tem_tabela_populacao:
+            join_populacao = f"""
+            LEFT JOIN (
+                SELECT
+                    LPAD(CAST(id_municipio AS VARCHAR), 7, '0') AS id_municipio,
+                    TRY_CAST(populacao AS DOUBLE) AS populacao
+                FROM populacao_municipios
+                WHERE TRY_CAST(ano AS INTEGER) = {POPULATION_YEAR}
+            ) p ON LPAD(CAST(m.codigo_ibge AS VARCHAR), 7, '0') = p.id_municipio
+            """
+            select_populacao = (
+                "COALESCE(p.populacao, m.populacao) AS populacao,"
+                if tem_populacao_municipios
+                else "p.populacao AS populacao,"
+            )
+        else:
+            join_populacao = ""
+            select_populacao = "m.populacao AS populacao," if tem_populacao_municipios else "NULL::DOUBLE AS populacao,"
+
         # Prepara filtros
         filtro_uf = ""
         if lista_estados and len(lista_estados) > 0 and "BRASIL" not in lista_estados:
@@ -426,7 +616,15 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
                 COUNT(*) AS total_empresas,
                 COUNT(DISTINCT municipio) AS total_cidades,
                 COUNT(DISTINCT uf) AS total_estados,
-                COUNT(DISTINCT cnae_principal) AS total_cnaes
+                COUNT(DISTINCT cnae_principal) AS total_cnaes,
+                SUM(
+                    CASE
+                        WHEN (correio_eletronico IS NOT NULL AND TRIM(correio_eletronico) != '')
+                          OR (ddd_1 IS NOT NULL AND TRIM(ddd_1) != '' AND telefone_1 IS NOT NULL AND TRIM(telefone_1) != '')
+                          OR (ddd_2 IS NOT NULL AND TRIM(ddd_2) != '' AND telefone_2 IS NOT NULL AND TRIM(telefone_2) != '')
+                        THEN 1 ELSE 0
+                    END
+                ) AS empresas_com_contato
             FROM estabelecimentos
             WHERE situacao_cadastral = '02'
             {filtro_uf}
@@ -455,21 +653,61 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
         
         
         query_mapa = f"""
-            SELECT 
+            WITH base AS (
+                SELECT
+                    e.municipio,
+                    e.uf,
+                    e.cnae_principal
+                FROM estabelecimentos e
+                WHERE e.situacao_cadastral = '02'
+                {filtro_uf}
+                {filtro_cidade}
+                {filtro_cnae}
+            ),
+            agregada AS (
+                SELECT
+                    municipio,
+                    uf,
+                    COUNT(*) AS quantidade,
+                    COUNT(DISTINCT cnae_principal) AS cnaes_diferentes
+                FROM base
+                GROUP BY municipio, uf
+            ),
+            cnae_por_cidade AS (
+                SELECT
+                    municipio,
+                    uf,
+                    cnae_principal,
+                    COUNT(*) AS quantidade_cnae,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY municipio, uf
+                        ORDER BY COUNT(*) DESC, cnae_principal
+                    ) AS ordem
+                FROM base
+                GROUP BY municipio, uf, cnae_principal
+            )
+            SELECT
                 m.descricao AS cidade,
-                e.uf,
-                COUNT(*) AS quantidade,
-                COUNT(DISTINCT e.cnae_principal) AS cnaes_diferentes
-            FROM estabelecimentos e
-            LEFT JOIN municipios m ON e.municipio = m.codigo
-            WHERE e.situacao_cadastral = '02'
-            {filtro_uf}
-            {filtro_cidade}
-            {filtro_cnae}
-            AND m.descricao IS NOT NULL
-            GROUP BY m.descricao, e.uf
-            HAVING COUNT(*) >= 5
-            ORDER BY quantidade DESC
+                a.uf,
+                m.latitude AS lat,
+                m.longitude AS lon,
+                {select_populacao}
+                a.quantidade,
+                a.cnaes_diferentes,
+                cp.cnae_principal AS cnae_predominante,
+                COALESCE(c.descricao, cp.cnae_principal) AS setor_predominante,
+                cp.quantidade_cnae AS quantidade_cnae_predominante,
+                ROUND(cp.quantidade_cnae * 100.0 / a.quantidade, 2) AS percentual_cnae_predominante
+            FROM agregada a
+            LEFT JOIN municipios m ON a.municipio = m.codigo
+            {join_populacao}
+            LEFT JOIN cnae_por_cidade cp ON a.municipio = cp.municipio AND a.uf = cp.uf AND cp.ordem = 1
+            LEFT JOIN cnaes c ON cp.cnae_principal = c.codigo
+            WHERE m.descricao IS NOT NULL
+            AND m.latitude IS NOT NULL
+            AND m.longitude IS NOT NULL
+            AND a.quantidade >= 5
+            ORDER BY a.quantidade DESC
             LIMIT 500
         """
         df_mapa = con.execute(query_mapa).df()
@@ -478,7 +716,18 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
         query_top10 = f"""
             SELECT 
                 m.descricao || ' - ' || e.uf AS cidade_uf,
-                COUNT(*) AS total
+                m.descricao AS cidade,
+                e.uf,
+                COUNT(*) AS total,
+                COUNT(DISTINCT e.cnae_principal) AS cnaes_diferentes,
+                SUM(
+                    CASE
+                        WHEN (e.correio_eletronico IS NOT NULL AND TRIM(e.correio_eletronico) != '')
+                          OR (e.ddd_1 IS NOT NULL AND TRIM(e.ddd_1) != '' AND e.telefone_1 IS NOT NULL AND TRIM(e.telefone_1) != '')
+                          OR (e.ddd_2 IS NOT NULL AND TRIM(e.ddd_2) != '' AND e.telefone_2 IS NOT NULL AND TRIM(e.telefone_2) != '')
+                        THEN 1 ELSE 0
+                    END
+                ) AS com_contato
             FROM estabelecimentos e
             LEFT JOIN municipios m ON e.municipio = m.codigo
             WHERE e.situacao_cadastral = '02'
@@ -491,23 +740,14 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
             LIMIT 10
         """
         df_top10 = con.execute(query_top10).df()
-        
-        # Distribuição por CNAE/Setor
-        query_cnae_dist = f"""
-            SELECT 
-                c.descricao AS setor,
-                COUNT(*) AS total
-            FROM estabelecimentos e
-            JOIN cnaes c ON e.cnae_principal = c.codigo
-            WHERE e.situacao_cadastral = '02'
-            {filtro_uf}
-            {filtro_cidade}
-            {filtro_cnae}
-            GROUP BY c.descricao
-            ORDER BY total DESC
-            LIMIT 15
-        """
-        df_cnae_dist = con.execute(query_cnae_dist).df()
+        if not df_top10.empty:
+            df_top10['taxa_contato'] = (
+                df_top10['com_contato'] / df_top10['total'] * 100
+            ).round(1)
+            df_top10['indice_oportunidade'] = (
+                df_top10['total'] * (1 + (df_top10['taxa_contato'] / 100))
+                + df_top10['cnaes_diferentes'] * 5
+            ).round(1)
         
         # Distribuição por Estado
         query_uf_dist = f"""
@@ -523,6 +763,75 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
             ORDER BY total DESC
         """
         df_uf_dist = con.execute(query_uf_dist).df()
+
+        query_temporal = f"""
+            WITH base AS (
+                SELECT TRY_CAST(SUBSTR(data_inicio_atividade, 1, 4) AS INTEGER) AS ano
+                FROM estabelecimentos
+                WHERE situacao_cadastral = '02'
+                {filtro_uf}
+                {filtro_cidade}
+                {filtro_cnae}
+            )
+            SELECT ano, COUNT(*) AS empresas_abertas
+            FROM base
+            WHERE ano BETWEEN 1990 AND 2026
+            GROUP BY ano
+            ORDER BY ano
+        """
+        df_temporal = con.execute(query_temporal).df()
+
+        query_hhi = f"""
+            WITH dist AS (
+                SELECT municipio, COUNT(*) AS total
+                FROM estabelecimentos
+                WHERE situacao_cadastral = '02'
+                {filtro_uf}
+                {filtro_cidade}
+                {filtro_cnae}
+                GROUP BY municipio
+            ),
+            soma AS (
+                SELECT SUM(total) AS total_geral FROM dist
+            )
+            SELECT
+                ROUND(SUM(POWER(dist.total * 1.0 / soma.total_geral, 2)) * 10000, 2) AS hhi,
+                COUNT(*) AS mercados
+            FROM dist, soma
+        """
+        df_hhi = con.execute(query_hhi).df()
+
+        df_comparativo = pd.DataFrame()
+        if lista_cnaes and len(lista_cnaes) >= 2:
+            query_comparativo = f"""
+                SELECT
+                    e.cnae_principal AS codigo,
+                    COALESCE(c.descricao, e.cnae_principal) AS setor,
+                    COUNT(*) AS total,
+                    COUNT(DISTINCT e.municipio) AS cidades,
+                    COUNT(DISTINCT e.uf) AS estados,
+                    SUM(
+                        CASE
+                            WHEN (e.correio_eletronico IS NOT NULL AND TRIM(e.correio_eletronico) != '')
+                              OR (e.ddd_1 IS NOT NULL AND TRIM(e.ddd_1) != '' AND e.telefone_1 IS NOT NULL AND TRIM(e.telefone_1) != '')
+                              OR (e.ddd_2 IS NOT NULL AND TRIM(e.ddd_2) != '' AND e.telefone_2 IS NOT NULL AND TRIM(e.telefone_2) != '')
+                            THEN 1 ELSE 0
+                        END
+                    ) AS com_contato
+                FROM estabelecimentos e
+                LEFT JOIN cnaes c ON e.cnae_principal = c.codigo
+                WHERE e.situacao_cadastral = '02'
+                {filtro_uf}
+                {filtro_cidade}
+                {filtro_cnae}
+                GROUP BY e.cnae_principal, c.descricao
+                ORDER BY total DESC
+            """
+            df_comparativo = con.execute(query_comparativo).df()
+            if not df_comparativo.empty:
+                df_comparativo['taxa_contato'] = (
+                    df_comparativo['com_contato'] / df_comparativo['total'] * 100
+                ).round(1)
         
         con.close()
         
@@ -531,8 +840,11 @@ def buscar_dados_dashboard_executivo(lista_estados=None, lista_cidades=None, lis
             'setor_predominante': setor_predominante,
             'mapa': df_mapa,
             'top10_cidades': df_top10,
-            'distribuicao_cnae': df_cnae_dist,
-            'distribuicao_uf': df_uf_dist
+            'distribuicao_uf': df_uf_dist,
+            'tendencia_aberturas': df_temporal,
+            'hhi': df_hhi,
+            'comparativo_cnaes': df_comparativo,
+            'tem_populacao': tem_populacao
         }
     except Exception as e:
         if con:

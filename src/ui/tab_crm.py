@@ -1,6 +1,6 @@
 import streamlit as st
 from src.ui.icons import Icons
-from src.database.crm_repository import buscar_meu_pipeline, atualizar_lead_crm, excluir_do_crm, atualizar_leads_em_lote, excluir_leads_em_lote
+from src.database.crm_repository import buscar_meu_pipeline, atualizar_leads_em_lote, excluir_leads_em_lote
 
 def render_tab_crm():
     """

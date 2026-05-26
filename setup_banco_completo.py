@@ -33,8 +33,14 @@ colunas_empresas = [
 print("\n 1. Importando CNAEs...")
 try:
     con.execute("DROP TABLE IF EXISTS cnaes")
+    
+    # Lógica para aceitar ambos os nomes de arquivo CNAE
+    arquivo_cnae = "dados/CNAECNV.zip"
+    if not os.path.exists(arquivo_cnae) and os.path.exists("dados/Cnaes.zip"):
+        arquivo_cnae = "dados/Cnaes.zip"
+        
     # Lê usando Pandas para garantir encoding correto
-    with zipfile.ZipFile("dados/CNAECNV.zip") as z:
+    with zipfile.ZipFile(arquivo_cnae) as z:
         with z.open(z.namelist()[0]) as f:
             df_cnae = pd.read_csv(f, sep=';', encoding='latin1', header=None, names=['codigo', 'descricao'], dtype=str)
             con.execute("CREATE TABLE cnaes AS SELECT * FROM df_cnae")
@@ -54,7 +60,13 @@ total_geral = 0
 inicio_geral = time.time()
 
 for i in range(10):
-    arquivo_zip = f"dados/ESTABELE{i}.zip"
+    # Lógica para aceitar ambos os nomes de arquivo de Estabelecimentos
+    arquivo_zip_original = f"dados/ESTABELE{i}.zip"
+    arquivo_zip_novo = f"dados/Estabelecimentos{i}.zip"
+    
+    arquivo_zip = arquivo_zip_original
+    if not os.path.exists(arquivo_zip_original) and os.path.exists(arquivo_zip_novo):
+        arquivo_zip = arquivo_zip_novo
     
     if os.path.exists(arquivo_zip):
         print(f"    Abrindo {arquivo_zip}...", end=" ")
@@ -66,9 +78,6 @@ for i in range(10):
                 
                 # Abre o arquivo CSV dentro do ZIP sem extrair 
                 with z.open(nome_csv) as f:
-                    
-                    
-                   
                     chunks = pd.read_csv(
                         f, 
                         sep=';', 
@@ -97,7 +106,7 @@ for i in range(10):
             print(f"\n    Erro crítico no arquivo {i}: {e}")
             
     else:
-        print(f"     Arquivo {arquivo_zip} não encontrado.")
+        print(f"     Arquivos {arquivo_zip_original} ou {arquivo_zip_novo} não encontrados.")
 
 
 # FINALIZAÇÃO
@@ -106,3 +115,12 @@ print(f"\n FIM! Processamento concluído em {tempo_total:.1f} minutos.")
 print(f" Total de empresas importadas: {total_geral:,}")
 
 con.close()
+
+print("\n 3. Importando municipios, coordenadas e populacao IBGE 2025...")
+try:
+    from update_cidades import main as atualizar_municipios
+
+    atualizar_municipios()
+    print("    Municipios atualizados com populacao IBGE 2025.")
+except Exception as e:
+    print(f"    Erro ao atualizar municipios/populacao: {e}")
