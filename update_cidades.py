@@ -11,11 +11,13 @@ DB_FILE = Path("hunter_leads.db")
 POPULATION_YEAR = 2025
 CSV_CANDIDATES = [
     Path("dados/municipios.csv"),
+    Path("dados IBGE/municipios.csv"),
     Path("../dados IBGE/municipios.csv"),
     Path(r"C:\Users\david\Documents\Facul\Analise e Big data\A3\dados IBGE\municipios.csv"),
 ]
 POPULATION_CANDIDATES = [
     Path("dados/br_ibge_populacao_municipio.csv"),
+    Path("dados IBGE/br_ibge_populacao_municipio.csv"),
     Path("../dados IBGE/br_ibge_populacao_municipio.csv"),
     Path(r"C:\Users\david\Documents\Facul\Analise e Big data\A3\dados IBGE\br_ibge_populacao_municipio.csv"),
 ]
@@ -23,6 +25,43 @@ ZIP_CANDIDATES = [
     Path("dados/MUNICCSV.zip"),
     Path("dados/Municipios.zip"),
 ]
+
+BRAZIL_COORD_BOUNDS = {
+    "lat": (-35.0, 6.0),
+    "lon": (-75.0, -30.0),
+}
+
+UF_COORD_BOUNDS = {
+    "11": {"lat": (-13.8, -7.0), "lon": (-66.9, -59.5)},  # RO
+    "12": {"lat": (-11.3, -7.0), "lon": (-74.2, -66.4)},  # AC
+    "13": {"lat": (-10.0, 2.5), "lon": (-74.0, -56.0)},  # AM
+    "14": {"lat": (-1.8, 5.5), "lon": (-65.0, -58.5)},  # RR
+    "15": {"lat": (-10.2, 3.2), "lon": (-59.2, -45.3)},  # PA
+    "16": {"lat": (-1.5, 4.6), "lon": (-55.0, -49.4)},  # AP
+    "17": {"lat": (-13.8, -5.0), "lon": (-51.0, -45.5)},  # TO
+    "21": {"lat": (-10.6, -1.0), "lon": (-48.9, -41.7)},  # MA
+    "22": {"lat": (-11.0, -2.6), "lon": (-46.6, -40.0)},  # PI
+    "23": {"lat": (-8.0, -2.5), "lon": (-41.7, -37.0)},  # CE
+    "24": {"lat": (-7.0, -4.8), "lon": (-38.8, -34.8)},  # RN
+    "25": {"lat": (-8.5, -6.0), "lon": (-39.0, -34.6)},  # PB
+    "26": {"lat": (-9.7, -7.0), "lon": (-41.6, -34.5)},  # PE
+    "27": {"lat": (-10.6, -8.8), "lon": (-38.4, -35.1)},  # AL
+    "28": {"lat": (-11.7, -9.4), "lon": (-38.4, -36.0)},  # SE
+    "29": {"lat": (-18.5, -8.0), "lon": (-47.6, -37.0)},  # BA
+    "31": {"lat": (-23.0, -14.0), "lon": (-51.2, -39.8)},  # MG
+    "32": {"lat": (-21.5, -17.8), "lon": (-42.0, -39.6)},  # ES
+    "33": {"lat": (-23.6, -20.5), "lon": (-45.0, -40.7)},  # RJ
+    "35": {"lat": (-25.5, -19.7), "lon": (-53.2, -44.0)},  # SP
+    "41": {"lat": (-27.1, -22.3), "lon": (-55.0, -47.5)},  # PR
+    "42": {"lat": (-29.5, -25.8), "lon": (-54.1, -48.3)},  # SC
+    "43": {"lat": (-34.0, -27.0), "lon": (-57.8, -49.5)},  # RS
+    "50": {"lat": (-24.2, -17.0), "lon": (-58.4, -50.8)},  # MS
+    "51": {"lat": (-18.5, -7.0), "lon": (-62.0, -50.0)},  # MT
+    "52": {"lat": (-19.7, -12.4), "lon": (-53.3, -45.7)},  # GO
+    "53": {"lat": (-16.2, -15.4), "lon": (-48.3, -47.2)},  # DF
+}
+
+COORD_DIVISORS = (1, 10, 100, 1000, 10000)
 
 
 def _find_existing(paths: list[Path]) -> Path | None:
@@ -32,18 +71,39 @@ def _find_existing(paths: list[Path]) -> Path | None:
     return None
 
 
-def _normalize_brazil_coordinate(values: pd.Series, lower: float, upper: float) -> pd.Series:
+def _normalize_coordinate_by_uf(values: pd.Series, codigo_uf: pd.Series, axis: str) -> pd.Series:
+    if values is None:
+        return pd.Series(pd.NA, index=codigo_uf.index, dtype="Float64")
+
     numeric = pd.to_numeric(values, errors="coerce")
+    uf_codes = codigo_uf.fillna("").astype(str).str.replace(r"\.0$", "", regex=True).str.zfill(2)
+    result = pd.Series(pd.NA, index=numeric.index, dtype="Float64")
 
-    for _ in range(4):
-        outside_bounds = numeric.notna() & ((numeric < lower) | (numeric > upper))
-        if not outside_bounds.any():
-            break
-        numeric.loc[outside_bounds] = numeric.loc[outside_bounds] / 10
+    for idx, raw_value in numeric.items():
+        if pd.isna(raw_value):
+            continue
 
-    still_invalid = numeric.notna() & ((numeric < lower) | (numeric > upper))
-    numeric.loc[still_invalid] = pd.NA
-    return numeric
+        uf_bounds = UF_COORD_BOUNDS.get(uf_codes.loc[idx], {}).get(axis)
+        global_bounds = BRAZIL_COORD_BOUNDS[axis]
+        selected = None
+
+        if uf_bounds:
+            for divisor in COORD_DIVISORS:
+                candidate = float(raw_value) / divisor
+                if uf_bounds[0] <= candidate <= uf_bounds[1]:
+                    selected = candidate
+                    break
+
+        if selected is None:
+            for divisor in COORD_DIVISORS:
+                candidate = float(raw_value) / divisor
+                if global_bounds[0] <= candidate <= global_bounds[1]:
+                    selected = candidate
+                    break
+
+        result.loc[idx] = selected
+
+    return result
 
 
 def _read_population_csv(path: Path) -> pd.DataFrame:
@@ -84,8 +144,8 @@ def _read_ibge_csv(path: Path) -> pd.DataFrame:
     if missing:
         raise ValueError(f"CSV IBGE sem colunas obrigatorias: {', '.join(sorted(missing))}")
 
-    latitude = _normalize_brazil_coordinate(df.get("latitude"), -35.0, 6.0)
-    longitude = _normalize_brazil_coordinate(df.get("longitude"), -75.0, -30.0)
+    latitude = _normalize_coordinate_by_uf(df.get("latitude"), df["codigo_uf"], "lat")
+    longitude = _normalize_coordinate_by_uf(df.get("longitude"), df["codigo_uf"], "lon")
     populacao = pd.to_numeric(df["populacao"], errors="coerce") if "populacao" in df.columns else pd.NA
 
     result = pd.DataFrame(

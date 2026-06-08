@@ -334,6 +334,78 @@ def _camada_preenchimento_geojson(geojson: dict, cor: str) -> dict:
     }
 
 
+def _ponto_em_anel(lon: float, lat: float, anel: list) -> bool:
+    dentro = False
+    total = len(anel)
+    if total < 3:
+        return False
+
+    j = total - 1
+    for i in range(total):
+        xi, yi = anel[i][0], anel[i][1]
+        xj, yj = anel[j][0], anel[j][1]
+        cruza_latitude = (yi > lat) != (yj > lat)
+        if cruza_latitude:
+            x_intersecao = (xj - xi) * (lat - yi) / ((yj - yi) or 1e-12) + xi
+            if lon < x_intersecao:
+                dentro = not dentro
+        j = i
+
+    return dentro
+
+
+def _ponto_em_poligono(lon: float, lat: float, poligono: list) -> bool:
+    if not poligono or not _ponto_em_anel(lon, lat, poligono[0]):
+        return False
+
+    for buraco in poligono[1:]:
+        if _ponto_em_anel(lon, lat, buraco):
+            return False
+    return True
+
+
+def ponto_em_geojson(lat: float, lon: float, geojson: dict | None) -> bool:
+    if not geojson:
+        return True
+
+    tipo = geojson.get("type")
+    if tipo == "FeatureCollection":
+        return any(ponto_em_geojson(lat, lon, feature) for feature in geojson.get("features", []))
+    if tipo == "Feature":
+        return ponto_em_geojson(lat, lon, geojson.get("geometry"))
+    if tipo == "GeometryCollection":
+        return any(ponto_em_geojson(lat, lon, geometry) for geometry in geojson.get("geometries", []))
+    if tipo == "Polygon":
+        return _ponto_em_poligono(lon, lat, geojson.get("coordinates", []))
+    if tipo == "MultiPolygon":
+        return any(_ponto_em_poligono(lon, lat, poligono) for poligono in geojson.get("coordinates", []))
+
+    return True
+
+
+def carregar_malha_filtro_mapa(estado_atual: str) -> dict | None:
+    if estado_atual != "BRASIL":
+        codigo_uf = ESTADOS_IBGE_CODIGOS.get(estado_atual)
+        if codigo_uf:
+            geojson_estado = carregar_malha_ibge(f"Estado {estado_atual}", f"estados/{codigo_uf}")
+            if geojson_estado:
+                return geojson_estado
+    return carregar_malha_ibge("Brasil", "paises/BR")
+
+
+def filtrar_pontos_fora_territorio(df: pd.DataFrame, estado_atual: str) -> tuple[pd.DataFrame, int]:
+    geojson = carregar_malha_filtro_mapa(estado_atual)
+    if not geojson or df.empty:
+        return df, 0
+
+    mascara = df.apply(
+        lambda row: ponto_em_geojson(float(row["lat"]), float(row["lon"]), geojson),
+        axis=1,
+    )
+    removidos = int((~mascara).sum())
+    return df.loc[mascara].copy(), removidos
+
+
 def construir_camadas_delimitador_auto(estado_atual: str) -> tuple[list[dict], list[str]]:
     camadas = []
     nomes = []
@@ -782,6 +854,8 @@ with aba4:
         nivel_dash = nivel_dashboard(estado, cidade)
         titulo_contextual = titulo_dashboard(setor_pred, estado, cidade, lista_cnaes_dash)
         contexto_relatorio = f"Filtros: estado={estado}; cidade={cidade}; CNAEs={', '.join(lista_cnaes_dash) if lista_cnaes_dash else 'todos'}"
+        modo_mapa = "Volume absoluto"
+        ranking_mapa_exibido = False
 
         st.header(Icons.ABA_DASH + " " + titulo_contextual)
         col_rel1, col_rel2 = st.columns([4, 1])
@@ -798,35 +872,48 @@ with aba4:
             )
 
         st.markdown("### " + Icons.ABA_DASH + " Indicadores Principais")
-        col_kpi1, col_kpi2, col_kpi3, col_kpi4, col_kpi5 = st.columns(5)
-
-        col_kpi1.metric(
-            Icons.LOGO_PAGINA + " Total de Empresas Mapeadas",
-            formatar_numero(total_empresas),
-            help="Total de empresas ativas encontradas"
-        )
-        col_kpi2.metric(
-            Icons.ABA_PROSPECT + " Cobertura Geográfica",
-            f"{formatar_numero(total_cidades)} cidades",
-            delta=f"{total_estados} estados",
-            help="Quantidade de cidades únicas com empresas"
-        )
-        col_kpi3.metric(
-            Icons.ABA_DASH + " Setor Predominante",
-            setor_pred[:30] + "..." if len(setor_pred) > 30 else setor_pred,
-            help="CNAE com maior concentração de empresas"
-        )
-        col_kpi4.metric(
-            Icons.ABA_DASH + " Diversidade de Setores",
-            f"{formatar_numero(int(kpis['total_cnaes']))} CNAEs",
-            help="Quantidade de setores diferentes"
-        )
-        col_kpi5.metric(
-            Icons.PHONE + " Com Contato",
-            formatar_percentual(taxa_contato),
-            delta=f"{formatar_numero(empresas_com_contato)} empresas",
-            help="Empresas com e-mail ou telefone cadastrado"
-        )
+        kpi_cards = [
+            {
+                "label": Icons.LOGO_PAGINA + " Total de Empresas Mapeadas",
+                "value": formatar_numero(total_empresas),
+                "delta": None,
+                "help": "Total de empresas ativas encontradas",
+            },
+            {
+                "label": Icons.ABA_PROSPECT + " Cobertura Geográfica",
+                "value": f"{formatar_numero(total_cidades)} cidades",
+                "delta": f"{total_estados} estados",
+                "help": "Quantidade de cidades únicas com empresas",
+            },
+        ]
+        if len(lista_cnaes_dash) != 1:
+            kpi_cards.extend([
+                {
+                    "label": Icons.ABA_DASH + " Setor Predominante",
+                    "value": setor_pred[:30] + "..." if len(setor_pred) > 30 else setor_pred,
+                    "delta": None,
+                    "help": "CNAE com maior concentração de empresas",
+                },
+                {
+                    "label": Icons.ABA_DASH + " Diversidade de Setores",
+                    "value": f"{formatar_numero(int(kpis['total_cnaes']))} CNAEs",
+                    "delta": None,
+                    "help": "Quantidade de setores diferentes",
+                },
+            ])
+        kpi_cards.append({
+            "label": Icons.PHONE + " Com Contato",
+            "value": formatar_percentual(taxa_contato),
+            "delta": f"{formatar_numero(empresas_com_contato)} empresas",
+            "help": "Empresas com e-mail ou telefone cadastrado",
+        })
+        for col_kpi, card in zip(st.columns(len(kpi_cards)), kpi_cards):
+            col_kpi.metric(
+                card["label"],
+                card["value"],
+                delta=card["delta"],
+                help=card["help"],
+            )
         
         st.markdown("---")
         
@@ -836,6 +923,11 @@ with aba4:
             
             df_mapa = dados_dash['mapa'].copy()
             df_mapa = df_mapa.dropna(subset=['lat', 'lon'])
+            df_mapa, pontos_fora_territorio = filtrar_pontos_fora_territorio(df_mapa, estado)
+            if pontos_fora_territorio:
+                st.caption(
+                    f"{pontos_fora_territorio} ponto(s) foram ocultados por cair fora do limite geográfico do recorte."
+                )
             modo_mapa = st.radio(
                 "Modo do mapa",
                 ["Volume absoluto", "Indicador relativo"],
@@ -999,6 +1091,7 @@ with aba4:
                     width='stretch',
                     hide_index=True,
                 )
+                ranking_mapa_exibido = True
             
             with st.expander(Icons.COPIAR + " Ver dados do mapa"):
                 cols_mapa = ['cidade', 'uf', 'quantidade', 'valor_mapa', 'cnaes_diferentes']
@@ -1048,6 +1141,11 @@ with aba4:
         with col_graf1:
             if dados_dash.get('top10_cidades') is not None and not dados_dash['top10_cidades'].empty:
                 df_top10 = dados_dash['top10_cidades'].copy()
+                top10_repete_ranking_mapa = (
+                    nivel_dash != "municipal"
+                    and ranking_mapa_exibido
+                    and modo_mapa == "Volume absoluto"
+                )
 
                 if nivel_dash == "municipal":
                     resumo_cidade = df_top10.iloc[0]
@@ -1059,6 +1157,8 @@ with aba4:
                     st.caption(
                         f"Recorte municipal ativo: {resumo_cidade['cidade_uf']}, {formatar_numero(int(resumo_cidade['total']))} empresas filtradas e {formatar_percentual(float(resumo_cidade['taxa_contato']))} com contato."
                     )
+                elif top10_repete_ranking_mapa:
+                    pass
                 else:
                     st.markdown(Icons.ABA_DASH + " " + titulo_top_cidades(nivel_dash, estado))
 
